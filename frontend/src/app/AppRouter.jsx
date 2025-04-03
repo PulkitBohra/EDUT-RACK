@@ -6,6 +6,7 @@ import Signup from "../auth/Signup";      // Import Signup component
 import UploadExcel from "../upload/UploadExcel"; 
 import InputForm from "@/form/InputForm";
 import ComponentNames from "@/form/ComponentNames";
+import UploadedFilesPage from "@/upload/UploadedFilesPage"; 
 
 
 const AppRouter = () => {
@@ -17,6 +18,7 @@ const AppRouter = () => {
       <Route path="/upload" element={<UploadExcel />} />
       <Route path="/components" element={<ComponentNames />} />
       <Route path="/input" element={<InputForm />} />
+      <Route path="/uploaded-files" element={<UploadedFilesPage />} />
     </Routes>
   );
 };
