@@ -1,4 +1,4 @@
-import { FormControl, Input, FormLabel, Select, Flex, Text, Button, useToast, Spinner } from '@chakra-ui/react';
+import { FormControl, Select, FormLabel, Flex, Text, Button, useToast, Spinner } from '@chakra-ui/react';
 import { Global } from '@emotion/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -36,7 +36,6 @@ const InputForm = () => {
                 duration: 3000,
                 isClosable: true,
             });
-
             navigate('/components', { state: { formData } });
         }, 1500);
     };
@@ -46,21 +45,37 @@ const InputForm = () => {
     return (
         <>
             <MainHeader />
-            <Global styles={{ body: { background: "url('/a.jpg')", backgroundSize: 'cover' } }} />
+            <Global styles={{
+                body: {
+                    background: " url('/a.jpg')",
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    minHeight: '100vh',
+                    color: 'white',
+                }
+            }} />
 
             <Flex w="100%" minH="100vh" justify="center" alignItems="center" p={6}>
-                <Flex w={{ base: "90%", md: "600px" }} bg="white" boxShadow="xl" p={8} borderRadius="lg" flexDirection="column">
-                    <Text fontSize="3xl" fontWeight="bold" color="black" textAlign="center" mb={6}>
+                <Flex
+                    w={{ base: "90%", md: "600px" }}
+                    bg="gray.900"
+                    boxShadow="2xl"
+                    p={10}
+                    opacity={0.9}
+                    borderRadius="2xl"
+                    flexDirection="column"
+                >
+                    <Text fontSize="3xl" fontWeight="bold" color="teal.700" textAlign="center" mb={6}>
                         Course Outcome Mapping
                     </Text>
 
                     <FormControl isRequired>
-                        <FormLabel>Select College Name</FormLabel>
+                        <FormLabel fontWeight="semibold">Select College Name</FormLabel>
                         <Select id='clg_name' placeholder='Select College name' bg="gray.100" mb={4} value={formData.clg_name} onChange={handleChange}>
                             <option>The LNM INSTITUTE OF TECHNOLOGY</option>
                         </Select>
 
-                        <FormLabel>Select Branch</FormLabel>
+                        <FormLabel fontWeight="semibold">Select Branch</FormLabel>
                         <Select id='Branch_name' placeholder='Select Branch' bg="gray.100" mb={4} value={formData.Branch_name} onChange={handleChange}>
                             <option>B.Tech Computer Science and Engineering</option>
                             <option>B.Tech Communication and Computer Engineering</option>
@@ -71,7 +86,7 @@ const InputForm = () => {
                             <option>Training Program</option>
                         </Select>
 
-                        <FormLabel>Select Course</FormLabel>
+                        <FormLabel fontWeight="semibold">Select Course</FormLabel>
                         <Select id='Course_name' placeholder='Select Course' bg="gray.100" mb={4} value={formData.Course_name} onChange={handleChange}>
                             <option>Course 1</option>
                             <option>Course 2</option>
@@ -80,31 +95,36 @@ const InputForm = () => {
                             <option>Course 5</option>
                         </Select>
 
-                        <FormLabel>Enter Number of Course Outcomes</FormLabel>
+                        <FormLabel fontWeight="semibold">Enter Number of Course Outcomes</FormLabel>
                         <Select id='Course_outcome' placeholder='Select Outcomes' bg="gray.100" mb={4} value={formData.Course_outcome} onChange={handleChange}>
-                            <option>1</option>
-                            <option>2</option>
-                            <option>3</option>
-                            <option>4</option>
-                            <option>5</option>
-                            <option>6</option>
-                            <option>7</option>
+                            {[...Array(7)].map((_, i) => (
+                                <option key={i + 1}>{i + 1}</option>
+                            ))}
                         </Select>
 
-                        <FormLabel>Select Number of Components</FormLabel>
+                        <FormLabel fontWeight="semibold">Select Number of Components</FormLabel>
                         <Select id='Components' placeholder='Number of Components' bg="gray.100" mb={4} value={formData.Components} onChange={handleChange}>
-                            <option>1</option>
-                            <option>2</option>
-                            <option>3</option>
-                            <option>4</option>
-                            <option>5</option>
-                            <option>6</option>
-                            <option>7</option>
+                            {[...Array(7)].map((_, i) => (
+                                <option key={i + 1}>{i + 1}</option>
+                            ))}
                         </Select>
                     </FormControl>
 
-                    <Button fontSize="lg" mt={6} colorScheme="blue" onClick={handleSubmit} isDisabled={!isFormComplete} w="full">
-                        {isLoading ? <Spinner size="sm" /> : "Next"}
+                    <Button
+                        fontSize="lg"
+                        mt={6}
+                        bg="teal.700"
+                        color="white"
+                        _hover={{ bg: 'teal.800' }}
+                        _active={{ bg: 'teal.900' }}
+                        onClick={handleSubmit}
+                        isDisabled={!isFormComplete}
+                        w="full"
+                        py={6}
+                        borderRadius="xl"
+                        transition="all 0.2s ease-in-out"
+                    >
+                        {isLoading ? <Spinner size="sm" color="white" /> : "Next"}
                     </Button>
                 </Flex>
             </Flex>

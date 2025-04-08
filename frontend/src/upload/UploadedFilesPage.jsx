@@ -1,248 +1,336 @@
-import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Box, Text, Table, Thead, Tbody, Tr, Th, Td, TableContainer, Input } from "@chakra-ui/react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import React, { useState, useEffect } from "react";
+import {
+    Box,
+    Text,
+    Heading,
+    Card,
+    CardBody,
+    Flex,
+    Button,
+    Table,
+    Thead,
+    Tbody,
+    Tr,
+    Th,
+    Td,
+    Divider,
+    Collapse,
+    Wrap,
+    FormControl,
+    FormLabel,
+    Input,
+    WrapItem,
+    useColorModeValue,
+} from "@chakra-ui/react";
+import { useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
 import MainHeader from "@/shared/MainHeader";
-import { Divider } from "@chakra-ui/react";
-import * as XLSX from "xlsx";
+import { Global } from "@emotion/react";
 
 const UploadedFilesPage = () => {
     const location = useLocation();
-    const navigate = useNavigate();
-    const { selectedFiles = [], fileContents = [] } = location.state || {};
+    const rawFileContents = location.state?.fileContents || {};
+    const [processedData, setProcessedData] = useState({});
+    const [expandedSheet, setExpandedSheet] = useState(null);
+    const [threshold, setThreshold] = useState(50); // Default threshold value
 
-    const [processedData, setProcessedData] = useState([]);
-    const [thresholdPercent, setThresholdPercent] = useState(50);
+    const tableBg = useColorModeValue("white", "gray.700");
+    const headerBg = useColorModeValue("blue.500", "blue.300");
+    const headerColor = useColorModeValue("white", "gray.800");
+    const stripBg = useColorModeValue("gray.50", "gray.800");
 
     useEffect(() => {
-        if (fileContents.length > 0) {
-            const transformedData = fileContents.map((fileContent) => {
-                if (!fileContent || !fileContent.headers || !fileContent.rows) return null;
+        const processFiles = () => {
+            const finalData = {};
 
-                const headers = fileContent.headers.slice(3);
-                const dataRows = fileContent.rows.filter(row => row[1] && isNaN(row[1]));
-                const marksRow = fileContent.rows[fileContent.rows.length - 1].slice(3);
-                const marksDistribution = marksRow.map((val) => parseFloat(val) || 0);
-                const totalStudents = dataRows.length;
-                const thresholdMarks = marksDistribution.map((mark) => (mark * thresholdPercent) / 100);
+            for (const [sheetName, coData] of Object.entries(rawFileContents)) {
+                let studentNames = [];
+                let rollNumbers = [];
+                let totalMarks = [];
 
-                const students = dataRows.map((row) => {
-                    const rollNo = row[1];
-                    const studentMarks = row.slice(3).map((val) => parseFloat(val) || 0);
-                    const totalMarks = studentMarks.reduce((sum, val) => sum + val, 0).toFixed(2);
-                    return { rollNo, marks: studentMarks, totalMarks };
-                });
+                const sheetEntries = Object.entries(coData);
+                for (const [key, value] of sheetEntries) {
+                    const keyLower = key.toLowerCase();
+                    if (keyLower.includes("name") && !keyLower.includes("co")) {
+                        studentNames = Array.isArray(value) ? value : [];
+                    } else if (keyLower.includes("roll")) {
+                        rollNumbers = Array.isArray(value) ? value : [];
+                    } else if (/^total\s*marks?$/.test(keyLower.trim())) {
+                        totalMarks = Array.isArray(value) ? value : [];
+                    }
+                }
 
-                const studentsAboveThreshold = thresholdMarks.map((threshold, index) => {
-                    return students.filter(student => student.marks[index] >= threshold).length;
-                });
-
-                const percentageAttainment = studentsAboveThreshold.map((numStudents) =>
-                    totalStudents > 0 ? (100 * numStudents) / totalStudents : 0
+                const actualCOs = Object.fromEntries(
+                    sheetEntries.filter(([key]) => key.toLowerCase().includes("co"))
                 );
 
-                const attainmentLevel = percentageAttainment.map((percent) => {
-                    if (percent > 80) return 3;
-                    if (percent >= 40) return 2;
-                    return 1;
-                });
-
-                return {
-                    headers,
-                    marksDistribution,
-                    students,
-                    thresholdMarks,
-                    studentsAboveThreshold,
-                    totalStudents,
-                    percentageAttainment,
-                    attainmentLevel
+                finalData[sheetName] = {
+                    coData: actualCOs,
+                    studentNames,
+                    rollNumbers,
+                    totalMarks,
                 };
-            });
+            }
 
-            setProcessedData(transformedData);
-        }
-    }, [fileContents, thresholdPercent]);
+            setProcessedData(finalData);
+        };
 
-    const downloadExcel = () => {
-        const wb = XLSX.utils.book_new();
-        
-        processedData.forEach((data, fileIndex) => {
-            const sheetData = [];
+        processFiles();
+    }, [rawFileContents]);
 
-            // Student Data Table
-            sheetData.push(["Student Data"]);
-            sheetData.push(["Roll No", ...data.headers, "Total Marks"]);
-            data.students.forEach(student => {
-                sheetData.push([student.rollNo, ...student.marks, student.totalMarks]);
-            });
-
-            // Add a blank row for spacing
-            sheetData.push([]);
-            sheetData.push([]);
-
-            // Attainment Table
-            sheetData.push(["Attainment Data"]);
-            sheetData.push(["COs", ...data.headers]);
-            sheetData.push(["Marks", ...data.marksDistribution]);
-            sheetData.push(["Total No. of Students in Class", ...Array(data.headers.length).fill(data.totalStudents - 1)]);
-            sheetData.push(["Threshold Marks", ...data.thresholdMarks]);
-            sheetData.push(["No. of Students Above Threshold", ...data.studentsAboveThreshold]);
-            sheetData.push(["Percentage Attainment", ...data.percentageAttainment.map((p) => p.toFixed(2))]);
-            sheetData.push(["Attainment Level", ...data.attainmentLevel]);
-
-            // Add a blank row for spacing
-            sheetData.push([]);
-            sheetData.push([]);
-
-            // CO-wise Attainment Level Table
-            sheetData.push(["CO-wise Attainment Level"]);
-            sheetData.push(["CO", "CO wise Attainment Level"]);
-            data.headers.forEach((header, i) => {
-                sheetData.push([header, data.attainmentLevel[i]]);
-            });
-
-            // Convert data to sheet and add to workbook
-            const ws = XLSX.utils.aoa_to_sheet(sheetData);
-            XLSX.utils.book_append_sheet(wb, ws, `Processed Data ${fileIndex + 1}`);
-        });
-
-        XLSX.writeFile(wb, "Processed_Excel_Files.xlsx");
+    const toggleSheetDetails = (sheetName) => {
+        setExpandedSheet((prev) => (prev === sheetName ? null : sheetName));
     };
 
     return (
         <>
             <MainHeader />
-            <div className="min-h-screen flex flex-col items-center justify-center gap-6">
-                <Card className="w-[900px] bg-white/90 backdrop-blur-xl shadow-2xl rounded-3xl p-6 border border-white/30">
-                    <CardContent className="flex flex-col items-center w-full">
-                        <Text className="text-2xl font-bold text-gray-800 mb-4">Processed Data</Text>
+            <Global
+                styles={{
+                    body: {
+                        background: "url('/b.jpg')",
+                        backgroundSize: "cover",
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "center",
+                    },
+                }}
+            />
 
-                        <Box className="mb-4">
-                            <label className="text-gray-700 font-semibold">Threshold %:</label>
-                            <Input type="number" value={thresholdPercent} onChange={(e) => setThresholdPercent(e.target.value)} className="ml-2 border border-gray-300 rounded px-2 py-1 w-20" />
-                        </Box>
+            <Flex
+                minH="100vh"
+                align="start"
+                justify="center"
+                bg="rgba(255, 255, 255, 0.6)"
+                backdropFilter="blur(1px)"
+                px={4}
+                py={8}
+            >
+                <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    style={{ width: "100%", maxWidth: "1000px" }}
+                >
+                    <Heading size="xl" textAlign="center" mb={6} color="gray.800">
+                        Uploaded CO Analysis
+                    </Heading>
 
-                        {processedData.length === 0 ? (
-                            <Text className="text-gray-500">No valid data found.</Text>
-                        ) : (
-                            processedData.map((data, fileIndex) => (
-                                <Box key={fileIndex} mt={6} className="w-full">
-                                    <Text className="text-xl font-semibold text-indigo-600 mb-3">Excel File {fileIndex + 1}</Text>
-                                    <Divider borderColor="gray.400" mb={4} />
-                                    
-                                    {/* Display Student Data */}
-                                    <Text className="text-lg font-bold mt-4">Student Data</Text>
-                                    <TableContainer>
-                                        <Table size="sm">
-                                            <Thead>
-                                                <Tr>
-                                                    <Th>Roll No</Th>
-                                                    {data.headers.map((header, i) => <Th key={i}>{header}</Th>)}
-                                                    <Th>Total Marks</Th>
-                                                </Tr>
-                                            </Thead>
-                                            <Tbody>
-                                                {data.students.map((student, i) => (
-                                                    <Tr key={i}>
-                                                        <Td>{student.rollNo}</Td>
-                                                        {student.marks.map((mark, j) => <Td key={j}>{mark}</Td>)}
-                                                        <Td>{student.totalMarks}</Td>
-                                                    </Tr>
+                    {Object.keys(processedData).length === 0 ? (
+                        <Text textAlign="center" color="red.500">
+                            No file contents found. Please upload files first.
+                        </Text>
+                    ) : (
+                        <>
+                            <Wrap spacing={4} mb={6} justify="center">
+                                {Object.entries(processedData).map(([sheetName], index) => (
+                                    <WrapItem key={index}>
+                                        <Button
+                                            minW="150px"
+                                            colorScheme="blue"
+                                            color={"blue.600"}
+                                            bg={"gray.100"}
+                                            _hover={{ bg: "blue.600", color: "white" }}
+                                            onClick={() => toggleSheetDetails(sheetName)}
+                                            variant={expandedSheet === sheetName ? "solid" : "outline"}
+                                        >
+                                            {sheetName}
+                                        </Button>
+                                    </WrapItem>
+                                ))}
+                            </Wrap>
+
+                            {expandedSheet && (
+                                <Collapse in={true} animateOpacity>
+                                    <Card mb={6} borderRadius="2xl" bg={tableBg}>
+                                        <CardBody>
+                                            <Heading size="md" mb={1} color="blue.600">
+                                                Sheet: {expandedSheet}
+                                            </Heading>
+                                            <Divider my={4} />
+                                            <Box mt={6} overflowX="auto">
+                                                <Table size="sm" variant="striped" bg={stripBg}>
+                                                    <Thead bg={headerBg}>
+                                                        <Tr>
+                                                            <Th color={headerColor}>Roll No</Th>
+                                                            <Th color={headerColor}>Name</Th>
+                                                            {Object.keys(processedData[expandedSheet].coData).map((coKey) => (
+                                                                <Th key={coKey} color={headerColor}>Total of {coKey}</Th>
+                                                            ))}
+                                                            <Th color={headerColor}>Total Marks</Th>
+                                                        </Tr>
+                                                    </Thead>
+                                                    <Tbody>
+                                                        <Tr fontWeight="bold" color="gray.200">
+                                                            <Td></Td>
+                                                            <Td></Td>
+                                                            {Object.entries(processedData[expandedSheet].coData).map(([coKey, values]) => (
+                                                                <Td key={coKey}>{`Out of ${Array.isArray(values) ? values[1] || "N/A" : "N/A"}`}</Td>
+                                                            ))}
+                                                            <Td>{`Out of ${processedData[expandedSheet].totalMarks[1] ?? "0"}`}</Td>
+                                                        </Tr>
+                                                        {processedData[expandedSheet].studentNames.slice(1).map((_, studentIndex) => (
+                                                            <Tr key={studentIndex}>
+                                                                <Td>{processedData[expandedSheet].rollNumbers[studentIndex+1] || "N/A"}</Td>
+                                                                <Td>{processedData[expandedSheet].studentNames[studentIndex + 1] || "N/A"}</Td>
+                                                                {Object.entries(processedData[expandedSheet].coData).map(([coKey, values]) => (
+                                                                    <Td key={coKey}>{Array.isArray(values) ? values[studentIndex + 2] || "0" : "N/A"}</Td>
+                                                                ))}
+                                                                <Td>{processedData[expandedSheet].totalMarks[studentIndex + 2] ?? "0"}</Td>
+                                                            </Tr>
+                                                        ))}
+                                                    </Tbody>
+                                                </Table>
+                                            </Box>
+                                        </CardBody>
+                                    </Card>
+                                </Collapse>
+                            )}
+
+                            {expandedSheet && processedData[expandedSheet] && (
+                                <Box mt={8} overflowX="auto">
+                                    <Heading size="xl" mb={2} color="gray.700">
+                                        CO Attainment Summary
+                                    </Heading>
+                                    <Divider my={4} />
+                                    {expandedSheet && processedData[expandedSheet] && (
+                                        <Box mb={6} maxW="300px">
+                                            <FormControl>
+                                                <FormLabel fontWeight="bold" color={"black"}>Threshold Percentage</FormLabel>
+                                                <Input
+                                                    type="number"
+                                                    value={threshold}
+                                                    min={0}
+                                                    max={100}
+                                                    onChange={(e) => setThreshold(Number(e.target.value))}
+                                                    bg={tableBg}
+                                                    placeholder="Enter threshold (e.g., 50)"
+                                                />
+                                            </FormControl>
+                                        </Box>
+                                    )}
+                                    <Table size="sm" bg={tableBg} borderRadius="xl" boxShadow="md">
+                                        <Thead bg={headerBg}>
+                                            <Tr>
+                                                <Th color={headerColor}>CO</Th>
+                                                {Object.keys(processedData[expandedSheet].coData).map((coKey) => (
+                                                    <Th key={coKey} color={headerColor}>{coKey}</Th>
                                                 ))}
-                                            </Tbody>
-                                        </Table>
-                                    </TableContainer>
-
-                                                                        {/* Attainment Table */}
-                                                                        <TableContainer width="100%" overflowX="auto" mt={6}>
-                                        <Table variant="simple">
-                                            <Thead>
-                                                <Tr>
-                                                    <Th>COs</Th>
-                                                    {data.headers.map((header, i) => (
-                                                        <Th key={i} textAlign="center">{header}</Th>
-                                                    ))}
-                                                </Tr>
-                                                <Tr>
-                                                    <Th>Marks</Th>
-                                                    {data.marksDistribution.map((mark, i) => (
-                                                        <Th key={i} textAlign="center">{mark}</Th>
-                                                    ))}
-                                                </Tr>
-                                                <Tr>
-                                                    <Th>Total No. of Students in Class</Th>
-                                                    <Th colSpan={data.headers.length} textAlign="center">{data.totalStudents-1}</Th>
-                                                </Tr>
-                                                <Tr>
-                                                    <Th>Threshold Marks</Th>
-                                                    {data.thresholdMarks.map((mark, i) => (
-                                                        <Th key={i} textAlign="center">{mark}</Th>
-                                                    ))}
-                                                </Tr>
-                                                <Tr>
-                                                    <Th>No. of Students Above Threshold</Th>
-                                                    {data.studentsAboveThreshold.map((count, i) => (
-                                                        <Th key={i} textAlign="center">{count}</Th>
-                                                    ))}
-                                                </Tr>
-                                                <Tr>
-                                                    <Th>Percentage Attainment</Th>
-                                                    {data.percentageAttainment.map((percent, i) => (
-                                                        <Th key={i} textAlign="center">{percent.toFixed(2)}</Th>
-                                                    ))}
-                                                </Tr>
-                                                <Tr>
-                                                    <Th>CO-Wise Average Percentage Attainment</Th>
-                                                    {data.percentageAttainment.map((percent, i) => (
-                                                        <Th key={i} textAlign="center">{percent.toFixed(2)}</Th>
-                                                    ))}
-                                                </Tr>
-                                                <Tr>
-                                                    <Th>Attainment Level</Th>
-                                                    {data.attainmentLevel.map((level, i) => (
-                                                        <Th key={i} textAlign="center">{level}</Th>
-                                                    ))}
-                                                </Tr>
-                                            </Thead>
-                                        </Table>
-                                    </TableContainer>
-
-                                    {/* CO-wise Attainment Level Table */}
-                                    <TableContainer width="100%" overflowX="auto" mt={6}>
-                                        <Table variant="simple" border="1px solid gray">
-                                            <Thead>
-                                                <Tr>
-                                                    <Th textAlign="center">CO</Th>
-                                                    <Th textAlign="center">CO wise Attainment Level</Th>
-                                                </Tr>
-                                            </Thead>
-                                            <Tbody>
-                                                {data.headers.map((header, i) => (
-                                                    <Tr key={i}>
-                                                        <Td textAlign="center">{header}</Td>
-                                                        <Td textAlign="center">{data.attainmentLevel[i]}</Td>
-                                                    </Tr>
+                                            </Tr>
+                                        </Thead>
+                                        <Tbody>
+                                            <Tr><Td fontWeight="bold">Marks</Td>
+                                                {Object.values(processedData[expandedSheet].coData).map((arr, idx) => (
+                                                    <Td key={`marks-${idx}`}>{arr[1] || 0}</Td>
                                                 ))}
-                                            </Tbody>
-                                        </Table>
-                                    </TableContainer>
-                                    <Divider borderColor="gray.400" mb={4} />
-
+                                            </Tr>
+                                            <Tr><Td fontWeight="bold">Threshold %</Td>
+                                                {Object.values(processedData[expandedSheet].coData).map((_, idx) => (
+                                                    <Td key={`threshold-${idx}`}>{threshold}</Td>
+                                                ))}
+                                            </Tr>
+                                            <Tr><Td fontWeight="bold">Threshold Marks</Td>
+                                                {Object.values(processedData[expandedSheet].coData).map((arr, idx) => (
+                                                    <Td key={`threshold-marks-${idx}`}>{((arr[1] || 0)* (threshold / 100).toFixed(2))}</Td>
+                                                ))}
+                                            </Tr>
+                                            <Tr><Td fontWeight="bold">No. of Students ≥ Threshold</Td>
+                                                {Object.values(processedData[expandedSheet].coData).map((arr, idx) => {
+                                                    const thresholdmarks = (arr[1] || 0) * (threshold / 100);
+                                                    let above = 0;
+                                                    if (thresholdmarks > 0) {
+                                                        above = arr.slice(2).filter(mark => parseFloat(mark) >= thresholdmarks).length;
+                                                    }
+                                                    // else{
+                                                    //     above=0;
+                                                    // }                                                    
+                                                    return <Td key={`above-${idx}`}>{above}</Td>;
+                                                })}
+                                            </Tr>
+                                            <Tr><Td fontWeight="bold">Total Students</Td>
+                                                {Object.keys(processedData[expandedSheet].coData).map((_, idx) => (
+                                                    <Td key={`total-${idx}`}>{processedData[expandedSheet].studentNames.length - 1}</Td>
+                                                ))}
+                                            </Tr>
+                                            <Tr><Td fontWeight="bold">Percentage Attainment</Td>
+                                                {Object.values(processedData[expandedSheet].coData).map((arr, idx) => {
+                                                    const thresholdmarks = (arr[1] || 0) * (threshold / 100);;
+                                                    let above = 0;
+                                                    if (thresholdmarks > 0) {
+                                                        above = arr.slice(2).filter(mark => parseFloat(mark) >= thresholdmarks).length;
+                                                    }
+                                                    // else{
+                                                    //     above=0;
+                                                    // }                                                    
+                                                    const total = processedData[expandedSheet].studentNames.length - 1;
+                                                    return <Td key={`attainment-${idx}`}>{total > 0 ? ((above / total) * 100).toFixed(2) : "0.00"}</Td>;
+                                                })}
+                                            </Tr>
+                                            <Tr><Td fontWeight="bold">Attainment Level</Td>
+                                                {Object.values(processedData[expandedSheet].coData).map((arr, idx) => {
+                                                    const thresholdmarks = (arr[1] || 0) * (threshold / 100);
+                                                    let above = 0;
+                                                    if (thresholdmarks > 0) {
+                                                        above = arr.slice(2).filter(mark => parseFloat(mark) >= thresholdmarks).length;
+                                                    }
+                                                    // else{
+                                                    //     above=0;
+                                                    // }                                                    
+                                                    const total = processedData[expandedSheet].studentNames.length - 1;
+                                                    const perc = total > 0 ? ((above / total) * 100).toFixed(2) : "0.00";
+                                                    let level = 0;
+                                                    if (perc >= 80) level = 3;
+                                                    else if (perc <= 40 && perc > 0) level = 1;
+                                                    else if (perc >= 40 && perc <= 80) level = 2;
+                                                    return <Td key={`level-${idx}`}>{level}</Td>;
+                                                })}
+                                            </Tr>
+                                        </Tbody>
+                                    </Table>
                                 </Box>
-                            ))
-                        )}
+                            )}
 
-                        <Button className="mt-4 bg-green-600 text-white hover:bg-green-700" onClick={downloadExcel}>
-                            Download Processed Excel
-                        </Button>
-                        <Button className="mt-4 bg-indigo-600 text-white hover:bg-indigo-700" onClick={() => navigate("/")}>Upload More Files</Button>
-                    </CardContent>
-                </Card>
-            </div>
+                            <Divider my={4} />
+
+                            {expandedSheet && processedData[expandedSheet] && (
+                                <Box mt={8} overflowX="auto">
+                                    <Heading size="xl" mb={2} color="gray.700">CO Attainment Levels</Heading>
+                                    <Table variant="striped" size="sm" bg={tableBg} >
+                                        <Thead bg={headerBg}>
+                                            <Tr>
+                                                <Th color={headerColor}>CO</Th>
+                                                <Th color={headerColor}>Attainment Level</Th>
+                                            </Tr>
+                                        </Thead>
+                                        <Tbody>
+                                            {Object.entries(processedData[expandedSheet].coData).map(([coKey, arr], idx) => {
+                                                const thresholdmarks = (arr[1] || 0) * (threshold / 100);;
+                                                let above = 0;
+                                                if (thresholdmarks > 0) {
+                                                    above = arr.slice(2).filter(mark => parseFloat(mark) >= thresholdmarks).length;
+                                                }
+                                                const total = processedData[expandedSheet].studentNames.length - 1;
+                                                const perc = total > 0 ? (above / total) * 100 : 0;
+                                                let level = 0;
+                                                if (perc > 80) level = 3;
+                                                else if (perc <= 40 && perc > 0) level = 1;
+                                                else if (perc >= 40 && perc <= 80) level = 2;
+                                                return (
+                                                    <Tr key={idx}>
+                                                        <Td>{coKey}</Td>
+                                                        <Td fontWeight="bold">{level}</Td>
+                                                    </Tr>
+                                                );
+                                            })}
+                                        </Tbody>
+                                    </Table>
+                                </Box>
+                            )}
+                        </>
+                    )}
+                </motion.div>
+            </Flex>
         </>
     );
 };
 
 export default UploadedFilesPage;
-
