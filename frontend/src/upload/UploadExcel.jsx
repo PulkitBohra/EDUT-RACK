@@ -14,7 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { UploadCloud } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import * as XLSX from "xlsx";
 import MainHeader from "@/shared/MainHeader";
 import { Global } from "@emotion/react";
@@ -22,10 +22,13 @@ import { Global } from "@emotion/react";
 const FileUploadPage = () => {
   const navigate = useNavigate();
   const toast = useToast();
+  const location = useLocation();
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileContents, setFileContents] = useState({});
   const [sheetNames, setSheetNames] = useState([]); // Changed from sheetName to sheetNames
+  const { formData } = location.state || {};
+  const numCo = parseInt(formData?.Course_outcome, 10) || 0;
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -78,7 +81,7 @@ const FileUploadPage = () => {
           totalmarksIndex !== -1 ? corows.map((row) => row[totalmarksIndex] || "0") : [];
 
         let coData = {};
-        for (let i = 1; i <= 6; i++) {
+        for (let i = 1; i <= numCo; i++) {
           const coIndex = coheaders.findIndex((header) =>
             header?.toString().toLowerCase().startsWith(`total of co${i}`)
           );
