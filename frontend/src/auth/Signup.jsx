@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button"; // ShadCN UI Button
 import { Card, CardContent } from "@/components/ui/card";
 import { FaGoogle, FaGithub } from "react-icons/fa";
-import { Flex, Box, Text, Input, Divider } from "@chakra-ui/react"; // Chakra UI
+import { Flex, Box, Text, Input, Divider , Select} from "@chakra-ui/react"; // Chakra UI
+import axios from "axios";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -11,12 +12,25 @@ const Signup = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleSignup = () => {
-    if (fullName && email && password) {
-      alert("Account created successfully!");
-      navigate("/login"); // Redirect to login page after signup
-    } else {
-      alert("Please fill in all fields!");
+  const [role, setRole] = useState(" ");
+
+  const handleSignup = async () => {
+    if (!fullName || !email || !password || !role) {
+      alert("All fields are required");
+      return;
+    }
+
+    try {
+      const res = await axios.post("http://localhost:5000/api/auth/signup", {
+        fullName,
+        email,
+        password,
+        role,
+      });
+      alert("Signup successful");
+      navigate("/login");
+    } catch (err) {
+      alert(err.response?.data?.message || "Signup failed");
     }
   };
 
@@ -41,7 +55,11 @@ const Signup = () => {
         <Text fontSize="xl" fontWeight="bold">
           EduTrack
         </Text>
-        <Button variant="ghost" className="text-white hover:bg-white hover:text-black" onClick={() => navigate("/")}>
+        <Button
+          variant="ghost"
+          className="text-white hover:bg-white hover:text-black"
+          onClick={() => navigate("/")}
+        >
           Home
         </Button>
       </Flex>
@@ -88,8 +106,24 @@ const Signup = () => {
             onChange={(e) => setPassword(e.target.value)}
           />
 
+          {/* Role Dropdown (Using Chakra UI Select) */}
+          <Select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            size="lg"
+            className="w-full mb-4"
+            focusBorderColor="indigo.500"
+            placeholder="Select Role" // Placeholder text
+          >
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </Select>
+
           {/* Signup Button */}
-          <Button className="w-full bg-indigo-600 text-white hover:bg-indigo-700" onClick={handleSignup}>
+          <Button
+            className="w-full bg-indigo-600 text-white hover:bg-indigo-700"
+            onClick={handleSignup}
+          >
             Sign Up
           </Button>
 
@@ -98,11 +132,17 @@ const Signup = () => {
 
           {/* OAuth Buttons */}
           <Flex gap={4} w="full">
-            <Button variant="outline" className="w-full flex items-center justify-center gap-2">
+            <Button
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2"
+            >
               <FaGoogle className="text-red-500" />
               Sign up with Google
             </Button>
-            <Button variant="outline" className="w-full flex items-center justify-center gap-2">
+            <Button
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2"
+            >
               <FaGithub className="text-black" />
               Sign up with GitHub
             </Button>
