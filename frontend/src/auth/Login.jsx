@@ -3,18 +3,42 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button"; // ShadCN UI Button
 import { Card, CardContent } from "@/components/ui/card";
 import { FaGoogle, FaGithub } from "react-icons/fa";
-import { Flex, Box, Text, Input, Divider } from "@chakra-ui/react"; // Chakra UI
+import { Flex, Box, Text, Input, Divider, Select } from "@chakra-ui/react"; // Chakra UI
+import axios from "axios";
+import { useAuth } from "../context/AuthContext.jsx";  // Import useAuth to call login method
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();  // Get the login method from AuthContext
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState(""); // Set to an empty string
 
-  const handleLogin = () => {
-    if (email && password) {
-      navigate("/input"); // Redirect to Input Form Page
-    } else {
-      alert("Please enter email and password!");
+  const handleLogin = async () => {
+    if (!email || !password) {
+      alert("Please enter email and password");
+      return;
+    }
+
+    try {
+      const res = await axios.post("http://localhost:5000/api/auth/login", {
+        email,
+        password,
+      });
+      const { user, token } = res.data;
+
+      localStorage.setItem("token", token);
+      localStorage.setItem("role", user.role);
+
+      login(user);  // Use the login function to update context and localStorage
+
+      if (user.role === "admin") {
+        navigate("/admin-dashboard");
+      } else {
+        navigate("/user-profile");
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Login failed");
     }
   };
 
@@ -39,9 +63,9 @@ const Login = () => {
         <Text fontSize="xl" fontWeight="bold">
           EduTrack
         </Text>
-        <Button 
-          variant="ghost" 
-          className="text-white hover:bg-white hover:text-black" 
+        <Button
+          variant="ghost"
+          className="text-white hover:bg-white hover:text-black"
           onClick={() => navigate("/")}
         >
           Home
@@ -80,7 +104,20 @@ const Login = () => {
             onChange={(e) => setPassword(e.target.value)}
           />
 
-          {/* Updated Login Button with Hover Effects */}
+          {/* Role Dropdown (Using Chakra UI Select) */}
+          <Select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            size="lg"
+            className="w-full mb-4"
+            focusBorderColor="indigo.500"
+            placeholder="Select Role" // Placeholder text
+          >
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </Select>
+
+          {/* Login Button */}
           <Button
             className="w-full text-white font-bold transition duration-300"
             bg="#4F46E5" // Default background color
@@ -106,16 +143,16 @@ const Login = () => {
 
           {/* OAuth Buttons */}
           <Flex gap={4} w="full">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full flex items-center justify-center gap-2 
               hover:bg-gray-100 transition duration-300"
             >
               <FaGoogle className="text-red-500" />
               Sign in with Google
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full flex items-center justify-center gap-2 
               hover:bg-gray-100 transition duration-300"
             >
