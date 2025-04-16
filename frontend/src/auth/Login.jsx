@@ -31,6 +31,7 @@ const Login = () => {
       localStorage.setItem("role", user.role);
 
       login(user);  // Use the login function to update context and localStorage
+      
 
       if (user.role === "admin") {
         navigate("/admin-dashboard");

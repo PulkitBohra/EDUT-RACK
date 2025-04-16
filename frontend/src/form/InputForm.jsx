@@ -12,6 +12,8 @@ import { Global } from '@emotion/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainHeader from '../shared/MainHeader';
+import { useEffect } from 'react';
+import axios from 'axios';
 
 const InputForm = () => {
     const [formData, setFormData] = useState({
@@ -21,6 +23,8 @@ const InputForm = () => {
         Course_outcome: '',
         Components: '',
     });
+
+    const [userCourses, setUserCourses] = useState([]);
 
     const [isLoading, setIsLoading] = useState(false);
     const toast = useToast();
@@ -51,6 +55,33 @@ const InputForm = () => {
     };
 
     const isFormComplete = Object.values(formData).every((val) => val !== '');
+
+    useEffect(() => {
+      const fetchUserCourses = async () => {
+        try {
+          const token = localStorage.getItem("token"); // Make sure you're saving token on login
+          const res = await axios.get("http://localhost:5000/api/users/profile", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          setUserCourses(res.data.courses || []);
+        } catch (err) {
+          console.error("Failed to fetch courses:", err);
+          toast({
+            title: "Error",
+            description: "Could not fetch courses.",
+            status: "error",
+            duration: 3000,
+            isClosable: true,
+            position: "bottom-left",
+          });
+        }
+      };
+    
+      fetchUserCourses();
+    }, []);
+     
 
     return (
       <>
@@ -133,24 +164,23 @@ const InputForm = () => {
               </Select>
 
               <FormLabel fontWeight="semibold">Select Course</FormLabel>
-              <Select
-                id="Course_name"
-                bg="white"
-                color="black"
-                mb={4}
-                value={formData.Course_name}
-                onChange={handleChange}
-                focusBorderColor="teal.500"
-              >
-                <option value="" disabled hidden>
-                  Select Course
-                </option>
-                <option>Course 1</option>
-                <option>Course 2</option>
-                <option>Course 3</option>
-                <option>Course 4</option>
-                <option>Course 5</option>
-              </Select>
+<Select
+  id="Course_name"
+  bg="white"
+  color="black"
+  mb={4}
+  value={formData.Course_name}
+  onChange={handleChange}
+  focusBorderColor="teal.500"
+>
+  <option value="" disabled hidden>Select Course</option>
+  {userCourses.map((course, idx) => (
+    <option key={idx} value={course}>
+      {course}
+    </option>
+  ))}
+</Select>
+
 
               <FormLabel fontWeight="semibold">
                 Enter Number of Course Outcomes
