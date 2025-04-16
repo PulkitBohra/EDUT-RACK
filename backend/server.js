@@ -14,7 +14,19 @@ const User = require('./models/User'); // ✅ FIXED
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+const allowedOrigins = ["http://localhost:5173", "http://localhost:3000", "http://localhost:5000"];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true
+}));
+
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI)
@@ -27,7 +39,7 @@ app.use('/api/auth', authRoutes);
 // API route to fetch all users
 app.get("/api/users", async (req, res) => {
   try {
-    const users = await User.find();
+    const users = await User.find({}, 'fullname email role courses');  // Make sure only necessary fields are returned
     res.json(users);
   } catch (err) {
     console.error("Error fetching users:", err);
@@ -35,21 +47,53 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
+
 // API route to create a new user
 app.post("/api/users", async (req, res) => {
   try {
-    const { name, email, role } = req.body;
+    const { fullname, email, role, courses, password } = req.body;
+
+    // If no password is provided, set a default password
+    const userPassword = password || "defaultpassword123";
 
     const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(400).json({ message: 'User already exists' });
 
-    const newUser = new User({ name, email, role });
+    const newUser = new User({ fullname, email, role, courses, password: userPassword });
     await newUser.save();
 
     res.status(201).json(newUser);
   } catch (err) {
-    console.error("Error creating user:", err);
-    res.status(500).json({ message: "Error creating user" });
+    console.error("Error creating user:", err);  // More detailed logging
+    res.status(500).json({ message: "Error creating user", error: err.message });
+  }
+});
+
+
+
+app.put("/api/users/:id", async (req, res) => {
+  try {
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    res.json(updatedUser);
+  } catch (err) {
+    res.status(500).json({ message: "Error updating user" });
+  }
+});
+
+app.delete("/api/users/:id", async (req, res) => {
+  try {
+    const deletedUser = await User.findByIdAndDelete(req.params.id);
+    if (!deletedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ message: "User deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting user:", err);
+    res.status(500).json({ message: "Error deleting user" });
   }
 });
 

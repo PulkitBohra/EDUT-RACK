@@ -15,8 +15,8 @@ const Login = () => {
   const [role, setRole] = useState(""); // Set to an empty string
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      alert("Please enter email and password");
+    if (!email || !password || !role) {
+      alert("Please enter email and password and select a role");
       return;
     }
 

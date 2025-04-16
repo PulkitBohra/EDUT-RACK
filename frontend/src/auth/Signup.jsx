@@ -8,21 +8,21 @@ import axios from "axios";
 
 const Signup = () => {
   const navigate = useNavigate();
-  const [fullName, setFullName] = useState("");
+  const [fullname, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [role, setRole] = useState(" ");
 
   const handleSignup = async () => {
-    if (!fullName || !email || !password || !role) {
+    if (!fullname || !email || !password || !role) {
       alert("All fields are required");
       return;
     }
 
     try {
       const res = await axios.post("http://localhost:5000/api/auth/signup", {
-        fullName,
+        fullname,
         email,
         password,
         role,
@@ -82,7 +82,7 @@ const Signup = () => {
             variant="filled"
             focusBorderColor="indigo.500"
             className="w-full mb-3"
-            value={fullName}
+            value={fullname}
             onChange={(e) => setFullName(e.target.value)}
           />
           <Input
