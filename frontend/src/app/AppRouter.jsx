@@ -19,15 +19,15 @@ const AppRouter = () => {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-
-        {/* Protected Routes wrapped inside ProtectedRoute */}
-        <Route element={<ProtectedRoute />}>
           <Route path="/upload" element={<UploadExcel />} />
           <Route path="/components" element={<ComponentNames />} />
           <Route path="/input" element={<InputForm />} />
           <Route path="/uploaded-files" element={<UploadedFilesPage />} />
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
           <Route path="/user-profile" element={<UserProfile />} />
+
+        {/* Protected Routes wrapped inside ProtectedRoute */}
+        <Route element={<ProtectedRoute />}>
         </Route>
       </Routes>
     </AuthProvider>

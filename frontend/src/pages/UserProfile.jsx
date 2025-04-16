@@ -1,22 +1,15 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import {
-  Box,
-  Text,
-  Button,
-  Input,
-  VStack,
-  useToast,
-} from "@chakra-ui/react";
-import { useNavigate } from 'react-router-dom'; // Import useHistory for redirection
-import MainHeader from '../shared/MainHeader';
+import { Box, Text, Button, Input, VStack, useToast } from "@chakra-ui/react";
+import { useNavigate } from "react-router-dom"; // Import useHistory for redirection
+import MainHeader from "../shared/MainHeader";
 
 const UserProfile = () => {
   const [user, setUser] = useState({});
   const [updatedName, setUpdatedName] = useState("");
   const [updatedPassword, setUpdatedPassword] = useState("");
   const toast = useToast();
-  const navigate =  useNavigate(); // Hook for navigation
+  const navigate = useNavigate(); // Hook for navigation
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -60,7 +53,7 @@ const UserProfile = () => {
   return (
     <>
       <MainHeader />
-      
+
       <Box p={8}>
         <Text fontSize="2xl" fontWeight="bold" mb={4}>
           User Profile
@@ -69,13 +62,14 @@ const UserProfile = () => {
           <Text>Email: {user.email}</Text>
           <Input
             placeholder="Full Name"
-            value={updatedName}
+            value={updatedName ?? ""}
             onChange={(e) => setUpdatedName(e.target.value)}
           />
+
           <Input
             placeholder="New Password"
             type="password"
-            value={updatedPassword}
+            value={updatedPassword ?? ""}
             onChange={(e) => setUpdatedPassword(e.target.value)}
           />
           <Button colorScheme="blue" onClick={handleUpdate}>

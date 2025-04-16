@@ -46,7 +46,7 @@ const ComponentNames = () => {
     weights.forEach((w, idx) => {
       if (!/^\d+$/.test(w)) {
         weightErrors[idx] = "Only numbers allowed";
-      } else if (parseInt(w, 10) >= 100) {
+      } else if (parseInt(w, 10) > 100) {
         weightErrors[idx] = "Must be less than 100";
       } else {
         weightErrors[idx] = "";
