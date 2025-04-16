@@ -35,14 +35,21 @@ const login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-    const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, {
-      expiresIn: '1d',
-    });
+    // Generate JWT with role included
+    const token = jwt.sign(
+      { userId: user._id, role: user.role }, 
+      process.env.JWT_SECRET, 
+      { expiresIn: '3d' }
+    );
 
-    res.status(200).json({ token, user: { fullname: user.fullname, email: user.email, role: user.role } });
+    res.status(200).json({
+      token,
+      user: { fullname: user.fullname, email: user.email, role: user.role }
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 module.exports = { signup, login };
