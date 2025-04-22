@@ -36,6 +36,20 @@ const UploadedFilesPage = () => {
   const [expandedSheet, setExpandedSheet] = useState(null);
   const [threshold, setThreshold] = useState(50); // Default threshold value
 
+  const formData = location.state?.formData || {};
+  const componentNames = location.state?.componentNames || [];
+  const weights = location.state?.weights || [];
+  const coStatements = location.state?.coStatements || [];
+
+   // Extract the specific values we need
+  const branchName = formData?.Branch_name || "Branch Not Provided";
+  const courseName = formData?.Course_name || "Course Not Provided";
+  const className = formData?.Class || "Class Not Provided";
+  const semester = formData?.Semester || "Semester Not Provided";
+  const academicYear = formData?.AcademicYear || "Academic Year Not Provided";
+  const indirectAttainment = formData?.IndirectAttainment || 0;
+  
+
   const tableBg = useColorModeValue("white", "gray.700");
   const headerBg = useColorModeValue("blue.500", "blue.300");
   const headerColor = useColorModeValue("white", "gray.800");
@@ -86,13 +100,14 @@ const UploadedFilesPage = () => {
 
   const downloadAllSheetsAsExcel = () => {
     const workbook = XLSX.utils.book_new();
-    const courseAttainmentSummaryData = {}; 
-    const formData = location.state?.formData || {};
-    const componentNames = location.state?.componentNames || [];
-    const weights = location.state?.weights || [];
-    const coStatements = location.state?.coStatements || [];
-    // Normalize weights to be between 0 and 1
-    const normalizedWeights = weights.map(w => w / 100);
+  const courseAttainmentSummaryData = {};
+  const formData = location.state?.formData || {};
+  const componentNames = location.state?.componentNames || [];
+  const weights = location.state?.weights || [];
+  const coStatements = location.state?.coStatements || [];
+  
+  // Normalize weights to be between 0 and 1
+  const normalizedWeights = weights.map(w => w / 100);
     
 
     Object.keys(processedData).forEach((sheetName) => {
@@ -242,43 +257,143 @@ const UploadedFilesPage = () => {
       XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     });
 
-  // Add the Course Attainment Summary sheet after all individual sheets are processed
-  const courseSummaryHeader = ["COs", ...Object.keys(processedData)];
-  const courseSummaryRows = [];
+  // Now create the Detailed CO Analysis sheet
+const detailedCOAnalysisSheet = [];
 
-  Object.keys(courseAttainmentSummaryData).forEach((co) => {
-    const row = [co];
-    Object.keys(processedData).forEach((sheetName) => {
-      const val = courseAttainmentSummaryData[co][sheetName] ?? 0;
-      row.push(val);
-    });
-    courseSummaryRows.push(row);
-  });
+// Add header information
+detailedCOAnalysisSheet.push(["THE LNMIIT JAIPUR"]);
+detailedCOAnalysisSheet.push([`Department of ${branchName}`]);
+detailedCOAnalysisSheet.push(["Attainment of CO's"]);
+detailedCOAnalysisSheet.push([]); // Empty row
 
-  const finalCourseSummarySheet = [
-    ["Course Attainment Summary"],
-    [],
-    courseSummaryHeader,
-    ...courseSummaryRows,
+// Add program information row (merged cells in Excel)
+detailedCOAnalysisSheet.push([
+  `Program: ${branchName}`,
+  `${courseName}`,
+  `Class: ${className}`,
+  `Semester: ${semester}`,
+  `Academic Year: ${academicYear}`
+]);
+
+detailedCOAnalysisSheet.push([], []); // Empty rows
+
+
+detailedCOAnalysisSheet.push([
+  " ",
+  "",
+  "Direct Assessment",
+]);
+
+// Create table headers
+const tableHeaders = [
+  "Sr. No.",
+  "CO Statement",
+  ...componentNames,
+  //"Weightage", // New weightage row
+  "Attainment Level", // New column
+  //"Direct Assessment",
+  "Indirect Assessment",
+  "Overall Attainment on Scale of 3",
+  "Overall Percentage Attainment"
+];
+
+detailedCOAnalysisSheet.push(tableHeaders);
+
+// Add weightage row right after headers
+const weightageRow = [
+  "", // Empty for Sr. No.
+  "Weightage", // Empty for CO Statement
+  ...weights.map(w => `${(w/100).toFixed(3)}`), // Weightages for each component
+  //"", // Empty for Weightage header
+  "", // Empty for Attainment Level
+ // "", // Empty for Direct Assessment
+  "", // Empty for Indirect Assessment
+  "", // Empty for Overall Attainment
+  ""  // Empty for Overall Percentage
+];
+detailedCOAnalysisSheet.push(weightageRow);
+
+// Calculate and add data for each CO
+Object.keys(courseAttainmentSummaryData).forEach((co, index) => {
+  const coData = courseAttainmentSummaryData[co];
+  const rowData = [
+    `CO${index + 1}`, // Sr. No. as CO1, CO2, etc.
+    coStatements[index] || `CO Statement for ${co}`, // CO Statement
   ];
 
-  const courseAttainmentSummarySheet = XLSX.utils.aoa_to_sheet(finalCourseSummarySheet);
-  XLSX.utils.book_append_sheet(
-    workbook,
-    courseAttainmentSummarySheet,
-    "Course Attainment Summary"
-  );
+  // Add component values (Quiz1, Quiz2, etc.)
+  componentNames.forEach(component => {
+    rowData.push(coData[component] || 0);
+  });
 
+  // Add weightage sum (empty cell under weightage header)
+  //rowData.push("");
+
+  // Calculate Direct Assessment (weighted average of components where level > 0)
+  let directAssessmentNumerator = 0;
+  let directAssessmentDenominator = 0;
+  let attainmentLevel = 0;
   
-    const excelBuffer = XLSX.write(workbook, {
-      bookType: "xlsx",
-      type: "array",
-    });
+  componentNames.forEach((component, i) => {
+    const componentLevel = coData[component] || 0;
+    if (componentLevel > 0) {
+      directAssessmentNumerator += componentLevel * normalizedWeights[i];
+      directAssessmentDenominator += normalizedWeights[i];
+    }
+  });
+
+  if (directAssessmentDenominator > 0) {
+    attainmentLevel = directAssessmentNumerator / directAssessmentDenominator;
+  }
+
+  // Add Attainment Level
+  rowData.push(attainmentLevel.toFixed(2));
+
+  // Add Direct Assessment (same as attainment level in this case)
+  //rowData.push(attainmentLevel.toFixed(2));
+
+  // Add Indirect Assessment
+  rowData.push(indirectAttainment);
   
-    const data = new Blob([excelBuffer], { type: "application/octet-stream" });
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    saveAs(data, `Combined_CO_Analysis_${threshold}perc_${timestamp}.xlsx`);
-  };
+  // Calculate Overall Attainment (80% direct + 20% indirect)
+  const overallAttainment = (0.8 * attainmentLevel) + (0.2 * indirectAttainment);
+  rowData.push(overallAttainment.toFixed(2));
+  
+  // Calculate Overall Percentage Attainment
+  const overallPercentage = (overallAttainment / 3) * 100;
+  rowData.push(`${overallPercentage.toFixed(2)}%`);
+
+  detailedCOAnalysisSheet.push(rowData);
+});
+
+// Add the Detailed CO Analysis sheet to the workbook
+const detailedWorksheet = XLSX.utils.aoa_to_sheet(detailedCOAnalysisSheet);
+
+// Set column widths for better formatting
+const colWidths = [
+  { wch: 50 },  // Sr. No.
+  { wch: 40 },  // CO Statement
+  ...componentNames.map(() => ({ wch: 12 })), // Components
+  { wch: 12 },  // Weightage
+  { wch: 15 },  // Attainment Level
+  { wch: 15 },  // Direct Assessment
+  { wch: 15 },  // Indirect Assessment
+  { wch: 25 },  // Overall Attainment
+  { wch: 25 },  // Overall Percentage
+];
+detailedWorksheet['!cols'] = colWidths;
+
+XLSX.utils.book_append_sheet(workbook, detailedWorksheet, "Detailed CO Analysis");
+  // Generate and download the Excel file
+  const excelBuffer = XLSX.write(workbook, {
+    bookType: "xlsx",
+    type: "array",
+  });
+
+  const data = new Blob([excelBuffer], { type: "application/octet-stream" });
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  saveAs(data, `Combined_CO_Analysis_${threshold}perc_${timestamp}.xlsx`);
+};
   
 
   return (

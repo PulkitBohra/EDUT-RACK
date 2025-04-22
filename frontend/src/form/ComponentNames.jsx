@@ -116,6 +116,12 @@ const ComponentNames = () => {
           componentNames,
           weights: weights.map((w) => parseInt(w, 10)),
           coStatements,
+          branchName: programName,
+          courseName: courseName,
+          className,
+          semester,
+          academicYear,
+          indirectAttainment: parseFloat(indirectAttainment),
         },
       });
     } else {
@@ -218,7 +224,7 @@ const ComponentNames = () => {
               {Array.from(
                 { length: new Date().getFullYear() + 2 - 2002 + 1 },
                 (_, i) => {
-                  const startYear = new Date().getFullYear()  - i;
+                  const startYear = new Date().getFullYear() - i;
                   const endYear = startYear + 1;
                   return (
                     <option

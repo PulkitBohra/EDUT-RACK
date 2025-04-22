@@ -217,7 +217,7 @@ const InputForm = () => {
                 <option value="" disabled hidden>
                   Number of Components
                 </option>
-                {[...Array(7)].map((_, i) => (
+                {[...Array(12)].map((_, i) => (
                   <option key={i + 1}>{i + 1}</option>
                 ))}
               </Select>

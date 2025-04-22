@@ -126,8 +126,13 @@ const FileUploadPage = () => {
         isClosable: true,
         position: "bottom-right",
       });
-
-      navigate("/uploaded-files", { state: { fileContents } });
+      navigate("/uploaded-files", {
+        state: {
+          fileContents,
+          // Pass along all the data from the previous pages
+          ...location.state,
+        },
+      });
     }, 2000);
   };
 
