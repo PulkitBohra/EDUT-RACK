@@ -86,7 +86,15 @@ const UploadedFilesPage = () => {
 
   const downloadAllSheetsAsExcel = () => {
     const workbook = XLSX.utils.book_new();
-  
+    const courseAttainmentSummaryData = {}; 
+    const formData = location.state?.formData || {};
+    const componentNames = location.state?.componentNames || [];
+    const weights = location.state?.weights || [];
+    const coStatements = location.state?.coStatements || [];
+    // Normalize weights to be between 0 and 1
+    const normalizedWeights = weights.map(w => w / 100);
+    
+
     Object.keys(processedData).forEach((sheetName) => {
       const sheetData = processedData[sheetName];
       const coKeys = Object.keys(sheetData.coData);
@@ -193,6 +201,7 @@ const UploadedFilesPage = () => {
   
       // 3. CO LEVEL SUMMARY
       const levelSummary = [["CO Attainment Levels"], ["CO", "Attainment Level"]];
+      const coLevelMap = {};
       coKeys.forEach((co) => {
         const marks = sheetData.coData[co][1] || 0;
         if (marks === 0) {
@@ -211,8 +220,14 @@ const UploadedFilesPage = () => {
         else if (perc > 40 && perc < 80) level = 2;
   
         levelSummary.push([co, level]);
+
+        coLevelMap[co] = level;
+        if (!courseAttainmentSummaryData[co])
+        courseAttainmentSummaryData[co] = {};
+      courseAttainmentSummaryData[co][sheetName] = level;
       });
-  
+
+      
       const finalSheet = [
         ...sheetSection,
         [],
@@ -226,6 +241,34 @@ const UploadedFilesPage = () => {
       const worksheet = XLSX.utils.aoa_to_sheet(finalSheet);
       XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     });
+
+  // Add the Course Attainment Summary sheet after all individual sheets are processed
+  const courseSummaryHeader = ["COs", ...Object.keys(processedData)];
+  const courseSummaryRows = [];
+
+  Object.keys(courseAttainmentSummaryData).forEach((co) => {
+    const row = [co];
+    Object.keys(processedData).forEach((sheetName) => {
+      const val = courseAttainmentSummaryData[co][sheetName] ?? 0;
+      row.push(val);
+    });
+    courseSummaryRows.push(row);
+  });
+
+  const finalCourseSummarySheet = [
+    ["Course Attainment Summary"],
+    [],
+    courseSummaryHeader,
+    ...courseSummaryRows,
+  ];
+
+  const courseAttainmentSummarySheet = XLSX.utils.aoa_to_sheet(finalCourseSummarySheet);
+  XLSX.utils.book_append_sheet(
+    workbook,
+    courseAttainmentSummarySheet,
+    "Course Attainment Summary"
+  );
+
   
     const excelBuffer = XLSX.write(workbook, {
       bookType: "xlsx",
