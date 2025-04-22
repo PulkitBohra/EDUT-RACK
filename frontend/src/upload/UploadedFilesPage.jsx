@@ -28,6 +28,8 @@ import MainHeader from "@/shared/MainHeader";
 import { Global } from "@emotion/react";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import COAttainmentChart from '@/components/COAttainmentChart';
+import ExcelJS from 'exceljs';
 
 const UploadedFilesPage = () => {
   const location = useLocation();
@@ -55,6 +57,7 @@ const UploadedFilesPage = () => {
   const headerBg = useColorModeValue("blue.500", "blue.300");
   const headerColor = useColorModeValue("white", "gray.800");
   const stripBg = useColorModeValue("gray.50", "gray.800");
+
 
   useEffect(() => {
     const processFiles = () => {
@@ -368,6 +371,38 @@ const UploadedFilesPage = () => {
         `${row.overallPercentage.toFixed(2)}%`
       ]);
     });
+
+    // Add empty rows before new sections
+  detailedCOAnalysisSheet.push([], [], []);
+
+  // Add Attainment Targets table
+  detailedCOAnalysisSheet.push(["Attainment Targets"]);
+  detailedCOAnalysisSheet.push(["Target (%)", "CO"]);
+  detailedAnalysis.forEach(row => {
+    detailedCOAnalysisSheet.push([threshold, row.co]);
+  });
+
+  // Add empty rows before observations
+  detailedCOAnalysisSheet.push([], [], []);
+
+  // Add Observations
+  detailedCOAnalysisSheet.push(["Observations"]);
+  const highAttainmentCOs = detailedAnalysis.filter(row => row.overallPercentage >= threshold);
+  const lowAttainmentCOs = detailedAnalysis.filter(row => row.overallPercentage < threshold);
+  
+  detailedCOAnalysisSheet.push([
+    `1. ${highAttainmentCOs.length > 0 ? 
+      `COs (${highAttainmentCOs.map(row => row.co).join(', ')}) with attainment ≥ ${threshold}% indicate GOOD performance.` : 
+      `No COs met or exceeded the ${threshold}% target`}`
+  ]);
+  detailedCOAnalysisSheet.push([
+    `2. ${lowAttainmentCOs.length > 0 ? 
+      `COs (${lowAttainmentCOs.map(row => row.co).join(', ')}) with attainment < ${threshold}% suggest areas needing improvement.` : 
+      `All COs met or exceeded the ${threshold}% target`}`
+  ]);
+
+  // Note: The chart cannot be directly included in Excel, but the data is already present
+  // for users to create their own chart in Excel
 
     const detailedWorksheet = XLSX.utils.aoa_to_sheet(detailedCOAnalysisSheet);
     XLSX.utils.book_append_sheet(workbook, detailedWorksheet, "Detailed CO Analysis");
@@ -748,12 +783,13 @@ const UploadedFilesPage = () => {
               </Button>
 
               {showDetailedAnalysis && (
-                <Box mt={8} overflowX="auto">
-                  <Heading size="xl" mb={2} color="gray.700">
-                    Detailed CO Analysis
-                  </Heading>
-                  <Divider my={4} />
-                  <Table size="sm" bg={tableBg} borderRadius="xl" boxShadow="md">
+  <Box mt={8} overflowX="auto">
+    <Heading size="xl" mb={2} color="gray.700">
+      Detailed CO Analysis
+    </Heading>
+    <Divider my={4} />
+    
+    <Table size="sm" bg={tableBg} borderRadius="xl" boxShadow="md">
                     <Thead bg={headerBg}>
                       <Tr>
                         <Th color={headerColor}>CO</Th>
@@ -800,8 +836,83 @@ const UploadedFilesPage = () => {
                       ))}
                     </Tbody>
                   </Table>
-                </Box>
-              )}
+
+    {/* Add Threshold Table */}
+    <Box mt={8}>
+      <Heading size="md" mb={4} color="gray.700">
+        Attainment Targets
+      </Heading>
+      <Table size="sm" bg={tableBg} borderRadius="xl" boxShadow="md" maxW="300px">
+        <Thead bg={headerBg}>
+          <Tr>
+            <Th color={headerColor}>Target (%)</Th>
+            <Th color={headerColor}>CO</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
+          {getDetailedAnalysisData().map((row, index) => (
+            <Tr key={`target-${index}`}>
+              <Td>{threshold}</Td>
+              <Td>{row.co}</Td>
+            </Tr>
+          ))}
+        </Tbody>
+      </Table>
+    </Box>
+
+     {/* Add Observations */}
+     <Box mt={8}>
+      <Heading size="md" mb={4} color="gray.700">
+        Observations
+      </Heading>
+      <Card bg={tableBg} p={4}>
+        {(() => {
+          const analysisData = getDetailedAnalysisData();
+          const highAttainmentCOs = analysisData.filter(row => row.overallPercentage >= threshold);
+          const lowAttainmentCOs = analysisData.filter(row => row.overallPercentage < threshold);
+          
+          return (
+            <>
+              <Text mb={2}>
+                {highAttainmentCOs.length > 0 ? (
+                  `1. COs (${highAttainmentCOs.map(row => row.co).join(', ')}) with attainment ≥ ${threshold}% ` +
+                  `(ranging from ${Math.min(...highAttainmentCOs.map(row => row.overallPercentage)).toFixed(1)}% to ` +
+                  `${Math.max(...highAttainmentCOs.map(row => row.overallPercentage)).toFixed(1)}%) indicate GOOD performance.`
+                ) : (
+                  `1. No COs met or exceeded the ${threshold}% target`
+                )}
+              </Text>
+              <Text>
+                {lowAttainmentCOs.length > 0 ? (
+                  `2. COs (${lowAttainmentCOs.map(row => row.co).join(', ')}) with attainment < ${threshold}% ` +
+                  `(ranging from ${Math.min(...lowAttainmentCOs.map(row => row.overallPercentage)).toFixed(1)}% to ` +
+                  `${Math.max(...lowAttainmentCOs.map(row => row.overallPercentage)).toFixed(1)}%) suggest areas needing improvement.`
+                ) : (
+                  `2. All COs met or exceeded the ${threshold}% target`
+                )}
+              </Text>
+            </>
+          );
+        })()}
+      </Card>
+    </Box>
+
+    {/* Add Bar Graph */}
+    <Box mt={8}>
+      <Heading size="md" mb={4} color="gray.700">
+        Attainment vs Target
+      </Heading>
+      <Card bg={tableBg} p={4}>
+        <Box height="300px">
+          <COAttainmentChart 
+            data={getDetailedAnalysisData()} 
+            threshold={threshold} 
+          />
+        </Box>
+      </Card>
+    </Box>
+  </Box>
+)}
 
               <Button onClick={downloadAllSheetsAsExcel} colorScheme="green"  mt={4}
                 mb={6} overflowX="auto">
