@@ -31,12 +31,64 @@ import { saveAs } from "file-saver";
 import COAttainmentChart from "@/components/COAttainmentChart";
 import { toPng } from "html-to-image";
 
+// Custom Table Components
+const CustomTable = ({ children, ...props }) => (
+  <Table
+    size="sm"
+    variant="simple"
+    bg="white"
+    borderRadius="md"
+    boxShadow="md"
+    borderWidth="1px"
+    borderColor="gray.200"
+    sx={{
+      "th, td": {
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      },
+    }}
+    {...props}
+  >
+    {children}
+  </Table>
+);
+
+const CustomTh = ({ children, ...props }) => (
+  <Th
+    fontWeight="bold"
+    color="gray.800"
+    bg="gray.100"
+    borderColor="gray.300"
+    textTransform="none"
+    fontSize="sm"
+    py={3}
+    px={4}
+    {...props}
+  >
+    {children}
+  </Th>
+);
+
+const CustomTd = ({ children, ...props }) => (
+  <Td
+    fontWeight="medium"
+    borderColor="gray.200"
+    fontSize="sm"
+    py={2}
+    px={4}
+    {...props}
+  >
+    {children}
+  </Td>
+);
+
 const UploadedFilesPage = () => {
   const location = useLocation();
   const rawFileContents = location.state?.fileContents || {};
   const [processedData, setProcessedData] = useState({});
   const [expandedSheet, setExpandedSheet] = useState(null);
-  const [threshold, setThreshold] = useState(50); // Default threshold value
+  const [threshold, setThreshold] = useState(50);
   const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false);
   const [courseAttainmentSummaryData, setCourseAttainmentSummaryData] =
     useState({});
@@ -46,7 +98,7 @@ const UploadedFilesPage = () => {
   const weights = location.state?.weights || [];
   const coStatements = location.state?.coStatements || [];
 
-  // Extract the specific values we need
+  // Extract values
   const branchName = formData?.Branch_name || "Branch Not Provided";
   const courseName = formData?.Course_name || "Course Not Provided";
   const className = formData?.Class || "Class Not Provided";
@@ -92,7 +144,6 @@ const UploadedFilesPage = () => {
           totalMarks,
         };
 
-        // Calculate attainment levels for each CO
         const coKeys = Object.keys(actualCOs);
         coKeys.forEach((co) => {
           const marks = actualCOs[co][1] || 0;
@@ -178,14 +229,13 @@ const UploadedFilesPage = () => {
   const captureChartImage = async () => {
     const chartElement = document.getElementById("co-attainment-chart");
     if (!chartElement) return null;
-  
+
     try {
-      // Ensure white background for the capture
       const dataUrl = await toPng(chartElement, {
-        backgroundColor: '#FFFFFF', // White background
-        quality: 1 // Highest quality
+        backgroundColor: "#FFFFFF",
+        quality: 1,
       });
-      
+
       return dataUrl;
     } catch (error) {
       console.error("Error capturing chart:", error);
@@ -199,12 +249,40 @@ const UploadedFilesPage = () => {
     const normalizedWeights = weights.map((w) => w / 100);
     const chartImage = await captureChartImage();
 
-    // Create a function to add a worksheet with data
     const addWorksheet = (workbook, sheetName, data) => {
       const worksheet = workbook.addWorksheet(sheetName);
       data.forEach((row) => {
         worksheet.addRow(row);
       });
+
+      // Style header row
+      if (data.length > 0) {
+        const headerRow = worksheet.getRow(1);
+        headerRow.font = { bold: true };
+        headerRow.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFD3D3D3" },
+        };
+      }
+
+      // Set wrap text for all cells
+      worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.alignment = { wrapText: true };
+        });
+      });
+
+      // Auto-fit columns with a minimum width
+      worksheet.columns.forEach((column) => {
+        let maxLength = 0;
+        column.eachCell({ includeEmpty: true }, (cell) => {
+          const columnLength = cell.value ? cell.value.toString().length : 0;
+          if (columnLength > maxLength) maxLength = columnLength;
+        });
+        column.width = Math.min(Math.max(maxLength + 2, 10), 50); // Increased max width
+      });
+
       return worksheet;
     };
 
@@ -213,7 +291,6 @@ const UploadedFilesPage = () => {
       const sheetData = processedData[sheetName];
       const coKeys = Object.keys(sheetData.coData);
 
-      // Prepare data for this sheet
       const sheetDataRows = [
         ["Sheet Data"],
         [
@@ -390,7 +467,7 @@ const UploadedFilesPage = () => {
       [],
       [],
       ["CO Attainment Chart:"],
-      [], // Placeholder for image
+      [],
     ];
 
     const detailedWorksheet = addWorksheet(
@@ -398,32 +475,43 @@ const UploadedFilesPage = () => {
       "Detailed CO Analysis",
       detailedCOAnalysisSheet
     );
-    // Add the chart image if available
+
+    // Manually set column widths for specific columns that need more space
+    if (detailedWorksheet.columns && detailedWorksheet.columns.length > 1) {
+      // Make the CO Statement column wider (column B)
+      detailedWorksheet.columns[1].width = 50; // Set a fixed width for statement column
+
+      // Make component columns narrower (columns C, D, etc.)
+      componentNames.forEach((_, i) => {
+        if (detailedWorksheet.columns[2 + i]) {
+          detailedWorksheet.columns[2 + i].width = 15;
+        }
+      });
+    }
+
     if (chartImage) {
       try {
         const imageId = workbook.addImage({
-          base64: chartImage.split(',')[1],
-          extension: 'png'
+          base64: chartImage.split(",")[1],
+          extension: "png",
         });
-  
-        // Calculate position - after all content with some spacing
-        const imageRow = detailedCOAnalysisSheet.length + 3;
-        
+
         detailedWorksheet.addImage(imageId, {
-          tl: { col: 0, row: imageRow }, // Start at column B
+          tl: { col: 0, row: detailedCOAnalysisSheet.length + 3 },
           ext: { width: 600, height: 350 },
-          editAs: 'oneCell'
+          editAs: "oneCell",
         });
-  
-        // Merge cells to create space for the image
-        detailedWorksheet.mergeCells(`B${imageRow}:G${imageRow + 15}`);
-        
+
+        detailedWorksheet.mergeCells(
+          `B${detailedCOAnalysisSheet.length + 3}:G${
+            detailedCOAnalysisSheet.length + 18
+          }`
+        );
       } catch (error) {
         console.error("Error adding image to Excel:", error);
       }
     }
 
-    // Generate and download the Excel file
     const buffer = await workbook.xlsx.writeBuffer();
     const data = new Blob([buffer], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -496,85 +584,84 @@ const UploadedFilesPage = () => {
 
               {expandedSheet && (
                 <Collapse in={true} animateOpacity>
-                  <Card mb={6} borderRadius="2xl" bg={tableBg}>
+                  <Card mb={6} borderRadius="xl" bg={tableBg}>
                     <CardBody>
-                      <Heading size="md" mb={1} color="blue.600">
+                      <Heading size="md" mb={4} color="blue.600">
                         Sheet: {expandedSheet}
                       </Heading>
                       <Divider my={4} />
                       <Box mt={6} overflowX="auto">
-                        <Table size="sm" variant="striped" bg={stripBg}>
-                          <Thead bg={headerBg}>
+                        <CustomTable>
+                          <Thead>
                             <Tr>
-                              <Th color={headerColor}>Roll No</Th>
-                              <Th color={headerColor}>Name</Th>
+                              <CustomTh>Roll No</CustomTh>
+                              <CustomTh>Name</CustomTh>
                               {Object.keys(
                                 processedData[expandedSheet].coData
                               ).map((coKey) => (
-                                <Th key={coKey} color={headerColor}>
+                                <CustomTh key={coKey}>
                                   Total of {coKey}
-                                </Th>
+                                </CustomTh>
                               ))}
-                              <Th color={headerColor}>Total Marks</Th>
+                              <CustomTh>Total Marks</CustomTh>
                             </Tr>
                           </Thead>
                           <Tbody>
-                            <Tr fontWeight="bold" color="gray.200">
-                              <Td></Td>
-                              <Td></Td>
-                              {Object.entries(
+                            <Tr>
+                              <CustomTd></CustomTd>
+                              <CustomTd></CustomTd>
+                              {Object.values(
                                 processedData[expandedSheet].coData
-                              ).map(([coKey, values]) => (
-                                <Td
-                                  key={coKey}
-                                  color="gray.800"
-                                  fontWeight="semibold"
+                              ).map((arr, idx) => (
+                                <CustomTd
+                                  key={`marks-${idx}`}
+                                  fontWeight="bold"
                                 >
-                                  {Array.isArray(values) && values[1]
-                                    ? `Out of ${values[1]}`
+                                  {Array.isArray(arr) && arr[1]
+                                    ? `Out of ${arr[1]}`
                                     : 0}
-                                </Td>
+                                </CustomTd>
                               ))}
-                              <Td
-                                color="gray.800"
-                                fontWeight="semibold"
-                              >{`Out of ${
+                              <CustomTd fontWeight="bold">{`Out of ${
                                 processedData[expandedSheet].totalMarks[1] ??
                                 "0"
-                              }`}</Td>
+                              }`}</CustomTd>
                             </Tr>
                             {processedData[expandedSheet].studentNames
                               .slice(1)
                               .map((_, studentIndex) => (
-                                <Tr key={studentIndex}>
-                                  <Td>
+                                <Tr
+                                  key={studentIndex}
+                                  _hover={{ bg: "gray.50" }}
+                                >
+                                  <CustomTd>
                                     {processedData[expandedSheet].rollNumbers[
                                       studentIndex + 1
                                     ] || "N/A"}
-                                  </Td>
-                                  <Td>
+                                  </CustomTd>
+                                  <CustomTd>
                                     {processedData[expandedSheet].studentNames[
                                       studentIndex + 1
                                     ] || "N/A"}
-                                  </Td>
-                                  {Object.entries(
+                                  </CustomTd>
+                                  {Object.values(
                                     processedData[expandedSheet].coData
-                                  ).map(([coKey, values]) => (
-                                    <Td key={coKey}>
-                                      {Array.isArray(values)
-                                        ? values[studentIndex + 2] || "0"
+                                  ).map((arr, idx) => (
+                                    <CustomTd key={`val-${idx}`}>
+                                      {Array.isArray(arr)
+                                        ? arr[studentIndex + 2] || "0"
                                         : "N/A"}
-                                    </Td>
+                                    </CustomTd>
                                   ))}
-                                  <Td>
+                                  <CustomTd>
                                     {processedData[expandedSheet].totalMarks[
                                       studentIndex + 2
                                     ] ?? "0"}
-                                  </Td>
+                                  </CustomTd>
                                 </Tr>
                               ))}
                           </Tbody>
-                        </Table>
+                        </CustomTable>
                       </Box>
                     </CardBody>
                   </Card>
@@ -583,7 +670,7 @@ const UploadedFilesPage = () => {
 
               {expandedSheet && processedData[expandedSheet] && (
                 <Box mt={8} overflowX="auto">
-                  <Heading size="xl" mb={2} color="gray.700">
+                  <Heading size="xl" mb={4} color="gray.700">
                     CO Attainment Summary
                   </Heading>
                   <Divider my={4} />
@@ -605,53 +692,52 @@ const UploadedFilesPage = () => {
                       </FormControl>
                     </Box>
                   )}
-                  <Table
-                    size="sm"
-                    bg={tableBg}
-                    borderRadius="xl"
-                    boxShadow="md"
-                  >
-                    <Thead bg={headerBg}>
+                  <CustomTable>
+                    <Thead>
                       <Tr>
-                        <Th color={headerColor}>CO</Th>
+                        <CustomTh>Metric</CustomTh>
                         {Object.keys(processedData[expandedSheet].coData).map(
                           (coKey) => (
-                            <Th key={coKey} color={headerColor}>
-                              {coKey}
-                            </Th>
+                            <CustomTh key={coKey}>{coKey}</CustomTh>
                           )
                         )}
                       </Tr>
                     </Thead>
                     <Tbody>
                       <Tr>
-                        <Td fontWeight="bold">Marks</Td>
+                        <CustomTd fontWeight="bold">Marks</CustomTd>
                         {Object.values(processedData[expandedSheet].coData).map(
                           (arr, idx) => (
-                            <Td key={`marks-${idx}`}>{arr[1] || 0}</Td>
+                            <CustomTd key={`marks-${idx}`}>
+                              {arr[1] || 0}
+                            </CustomTd>
                           )
                         )}
                       </Tr>
                       <Tr>
-                        <Td fontWeight="bold">Threshold %</Td>
+                        <CustomTd fontWeight="bold">Threshold %</CustomTd>
                         {Object.values(processedData[expandedSheet].coData).map(
                           (_, idx) => (
-                            <Td key={`threshold-${idx}`}>{threshold}</Td>
+                            <CustomTd key={`threshold-${idx}`}>
+                              {threshold}
+                            </CustomTd>
                           )
                         )}
                       </Tr>
                       <Tr>
-                        <Td fontWeight="bold">Threshold Marks</Td>
+                        <CustomTd fontWeight="bold">Threshold Marks</CustomTd>
                         {Object.values(processedData[expandedSheet].coData).map(
                           (arr, idx) => (
-                            <Td key={`threshold-marks-${idx}`}>
+                            <CustomTd key={`threshold-marks-${idx}`}>
                               {(arr[1] || 0) * (threshold / 100).toFixed(2)}
-                            </Td>
+                            </CustomTd>
                           )
                         )}
                       </Tr>
                       <Tr>
-                        <Td fontWeight="bold">No. of Students ≥ Threshold</Td>
+                        <CustomTd fontWeight="bold">
+                          Students ≥ Threshold
+                        </CustomTd>
                         {Object.values(processedData[expandedSheet].coData).map(
                           (arr, idx) => {
                             const thresholdmarks =
@@ -664,23 +750,27 @@ const UploadedFilesPage = () => {
                                   (mark) => parseFloat(mark) >= thresholdmarks
                                 ).length;
                             }
-                            return <Td key={`above-${idx}`}>{above}</Td>;
+                            return (
+                              <CustomTd key={`above-${idx}`}>{above}</CustomTd>
+                            );
                           }
                         )}
                       </Tr>
                       <Tr>
-                        <Td fontWeight="bold">Total Students</Td>
+                        <CustomTd fontWeight="bold">Total Students</CustomTd>
                         {Object.keys(processedData[expandedSheet].coData).map(
                           (_, idx) => (
-                            <Td key={`total-${idx}`}>
+                            <CustomTd key={`total-${idx}`}>
                               {processedData[expandedSheet].studentNames
                                 .length - 1}
-                            </Td>
+                            </CustomTd>
                           )
                         )}
                       </Tr>
                       <Tr>
-                        <Td fontWeight="bold">Percentage Attainment</Td>
+                        <CustomTd fontWeight="bold">
+                          Percentage Attainment
+                        </CustomTd>
                         {Object.values(processedData[expandedSheet].coData).map(
                           (arr, idx) => {
                             const thresholdmarks =
@@ -697,17 +787,17 @@ const UploadedFilesPage = () => {
                               processedData[expandedSheet].studentNames.length -
                               1;
                             return (
-                              <Td key={`attainment-${idx}`}>
+                              <CustomTd key={`attainment-${idx}`}>
                                 {total > 0
                                   ? ((above / total) * 100).toFixed(2)
                                   : "0.00"}
-                              </Td>
+                              </CustomTd>
                             );
                           }
                         )}
                       </Tr>
                       <Tr>
-                        <Td fontWeight="bold">Attainment Level</Td>
+                        <CustomTd fontWeight="bold">Attainment Level</CustomTd>
                         {Object.values(processedData[expandedSheet].coData).map(
                           (arr, idx) => {
                             const thresholdmarks =
@@ -731,12 +821,14 @@ const UploadedFilesPage = () => {
                             if (perc >= 80) level = 3;
                             else if (perc <= 40 && perc > 0) level = 1;
                             else if (perc >= 40 && perc <= 80) level = 2;
-                            return <Td key={`level-${idx}`}>{level}</Td>;
+                            return (
+                              <CustomTd key={`level-${idx}`}>{level}</CustomTd>
+                            );
                           }
                         )}
                       </Tr>
                     </Tbody>
-                  </Table>
+                  </CustomTable>
                 </Box>
               )}
 
@@ -744,14 +836,14 @@ const UploadedFilesPage = () => {
 
               {expandedSheet && processedData[expandedSheet] && (
                 <Box mt={8} overflowX="auto">
-                  <Heading size="xl" mb={2} color="gray.700">
+                  <Heading size="xl" mb={4} color="gray.700">
                     CO Attainment Levels
                   </Heading>
-                  <Table variant="striped" size="sm" bg={tableBg}>
-                    <Thead bg={headerBg}>
+                  <CustomTable variant="striped" colorScheme="gray">
+                    <Thead>
                       <Tr>
-                        <Th color={headerColor}>CO</Th>
-                        <Th color={headerColor}>Attainment Level</Th>
+                        <CustomTh>CO</CustomTh>
+                        <CustomTh>Attainment Level</CustomTh>
                       </Tr>
                     </Thead>
                     <Tbody>
@@ -777,14 +869,14 @@ const UploadedFilesPage = () => {
                           else if (perc >= 40 && perc <= 80) level = 2;
                           return (
                             <Tr key={idx}>
-                              <Td>{coKey}</Td>
-                              <Td fontWeight="bold">{level}</Td>
+                              <CustomTd>{coKey}</CustomTd>
+                              <CustomTd fontWeight="bold">{level}</CustomTd>
                             </Tr>
                           );
                         }
                       )}
                     </Tbody>
-                  </Table>
+                  </CustomTable>
                 </Box>
               )}
 
@@ -804,94 +896,85 @@ const UploadedFilesPage = () => {
 
               {showDetailedAnalysis && (
                 <Box mt={8} overflowX="auto">
-                  <Heading size="xl" mb={2} color="gray.700">
+                  <Heading size="xl" mb={4} color="gray.700">
                     Detailed CO Analysis
                   </Heading>
                   <Divider my={4} />
 
-                  <Table
-                    size="sm"
-                    bg={tableBg}
-                    borderRadius="xl"
-                    boxShadow="md"
-                  >
-                    <Thead bg={headerBg}>
+                  <CustomTable variant="striped" colorScheme="gray">
+                    <Thead>
                       <Tr>
-                        <Th color={headerColor}>CO</Th>
-                        <Th color={headerColor}>Statement</Th>
+                        <CustomTh>CO</CustomTh>
+                        <CustomTh>Statement</CustomTh>
                         {componentNames.map((component) => (
-                          <Th key={component} color={headerColor}>
-                            {component}
-                          </Th>
+                          <CustomTh key={component}>{component}</CustomTh>
                         ))}
-                        <Th color={headerColor}>Attainment Level</Th>
-                        <Th color={headerColor}>Indirect Assessment</Th>
-                        <Th color={headerColor}>Overall Attainment</Th>
-                        <Th color={headerColor}>Percentage</Th>
+                        <CustomTh>Attainment Level</CustomTh>
+                        <CustomTh>Indirect Assessment</CustomTh>
+                        <CustomTh>Overall Attainment</CustomTh>
+                        <CustomTh>Percentage</CustomTh>
                       </Tr>
                       <Tr>
-                        <Th></Th>
-                        <Th></Th>
+                        <CustomTh></CustomTh>
+                        <CustomTh></CustomTh>
                         {componentNames.map((component, i) => (
-                          <Th key={`weight-${i}`} color={headerColor}>
+                          <CustomTh key={`weight-${i}`}>
                             Weight: {(weights[i] / 100).toFixed(3)}
-                          </Th>
+                          </CustomTh>
                         ))}
-                        <Th></Th>
-                        <Th></Th>
-                        <Th></Th>
-                        <Th></Th>
+                        <CustomTh></CustomTh>
+                        <CustomTh></CustomTh>
+                        <CustomTh></CustomTh>
+                        <CustomTh></CustomTh>
                       </Tr>
                     </Thead>
                     <Tbody>
                       {getDetailedAnalysisData().map((row, index) => (
-                        <Tr key={index}>
-                          <Td fontWeight="bold">{row.co}</Td>
-                          <Td>{row.statement}</Td>
+                        <Tr key={index} _hover={{ bg: "gray.50" }}>
+                          <CustomTd fontWeight="bold">{row.co}</CustomTd>
+                          <CustomTd>{row.statement}</CustomTd>
                           {componentNames.map((component) => (
-                            <Td key={`${row.co}-${component}`}>
+                            <CustomTd key={`${row.co}-${component}`}>
                               {row.components[component]?.value || 0}
-                            </Td>
+                            </CustomTd>
                           ))}
-                          <Td>{row.attainmentLevel.toFixed(2)}</Td>
-                          <Td>{row.indirectAssessment.toFixed(2)}</Td>
-                          <Td>{row.overallAttainment.toFixed(2)}</Td>
-                          <Td>{row.overallPercentage.toFixed(2)}%</Td>
+                          <CustomTd>{row.attainmentLevel.toFixed(2)}</CustomTd>
+                          <CustomTd>
+                            {row.indirectAssessment.toFixed(2)}
+                          </CustomTd>
+                          <CustomTd>
+                            {row.overallAttainment.toFixed(2)}
+                          </CustomTd>
+                          <CustomTd>
+                            {row.overallPercentage.toFixed(2)}%
+                          </CustomTd>
                         </Tr>
                       ))}
                     </Tbody>
-                  </Table>
+                  </CustomTable>
 
-                  {/* Add Threshold Table */}
                   <Box mt={8}>
                     <Heading size="md" mb={4} color="gray.700">
                       Attainment Targets
                     </Heading>
-                    <Table
-                      size="sm"
-                      bg={tableBg}
-                      borderRadius="xl"
-                      boxShadow="md"
-                      maxW="300px"
-                    >
-                      <Thead bg={headerBg}>
+                    <CustomTable maxW="300px">
+                      <Thead>
                         <Tr>
-                          <Th color={headerColor}>Target (%)</Th>
-                          <Th color={headerColor}>CO</Th>
+                          <CustomTh>Target (%)</CustomTh>
+                          <CustomTh>CO</CustomTh>
                         </Tr>
                       </Thead>
                       <Tbody>
                         {getDetailedAnalysisData().map((row, index) => (
                           <Tr key={`target-${index}`}>
-                            <Td>{threshold}</Td>
-                            <Td>{row.co}</Td>
+                            <CustomTd>{threshold}</CustomTd>
+                            <CustomTd>{row.co}</CustomTd>
                           </Tr>
                         ))}
                       </Tbody>
-                    </Table>
+                    </CustomTable>
                   </Box>
 
-                  {/* Add Observations */}
                   <Box mt={8}>
                     <Heading size="md" mb={4} color="gray.700">
                       Observations
@@ -908,7 +991,7 @@ const UploadedFilesPage = () => {
 
                         return (
                           <>
-                            <Text mb={2}>
+                            <Text mb={2} fontWeight="medium">
                               {highAttainmentCOs.length > 0
                                 ? `1. COs (${highAttainmentCOs
                                     .map((row) => row.co)
@@ -927,7 +1010,7 @@ const UploadedFilesPage = () => {
                                   ).toFixed(1)}%) indicate GOOD performance.`
                                 : `1. No COs met or exceeded the ${threshold}% target`}
                             </Text>
-                            <Text>
+                            <Text fontWeight="medium">
                               {lowAttainmentCOs.length > 0
                                 ? `2. COs (${lowAttainmentCOs
                                     .map((row) => row.co)
@@ -954,7 +1037,6 @@ const UploadedFilesPage = () => {
                     </Card>
                   </Box>
 
-                  {/* Add Bar Graph */}
                   <Box mt={8}>
                     <Heading size="md" mb={4} color="gray.700">
                       Attainment vs Target
@@ -963,8 +1045,9 @@ const UploadedFilesPage = () => {
                       <Box
                         id="co-attainment-chart"
                         height="400px"
-                        position="relative" // Add this
-                        zIndex="1" // Add this
+                        position="relative"
+                        zIndex="1"
+                        bg="white"
                       >
                         <COAttainmentChart
                           data={getDetailedAnalysisData()}
