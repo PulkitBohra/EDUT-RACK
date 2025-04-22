@@ -28,8 +28,8 @@ import MainHeader from "@/shared/MainHeader";
 import { Global } from "@emotion/react";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
-import COAttainmentChart from '@/components/COAttainmentChart';
-import ExcelJS from 'exceljs';
+import COAttainmentChart from "@/components/COAttainmentChart";
+import { toPng } from "html-to-image";
 
 const UploadedFilesPage = () => {
   const location = useLocation();
@@ -38,7 +38,8 @@ const UploadedFilesPage = () => {
   const [expandedSheet, setExpandedSheet] = useState(null);
   const [threshold, setThreshold] = useState(50); // Default threshold value
   const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false);
-  const [courseAttainmentSummaryData, setCourseAttainmentSummaryData] = useState({});
+  const [courseAttainmentSummaryData, setCourseAttainmentSummaryData] =
+    useState({});
 
   const formData = location.state?.formData || {};
   const componentNames = location.state?.componentNames || [];
@@ -57,7 +58,6 @@ const UploadedFilesPage = () => {
   const headerBg = useColorModeValue("blue.500", "blue.300");
   const headerColor = useColorModeValue("white", "gray.800");
   const stripBg = useColorModeValue("gray.50", "gray.800");
-
 
   useEffect(() => {
     const processFiles = () => {
@@ -130,7 +130,7 @@ const UploadedFilesPage = () => {
 
   const getDetailedAnalysisData = () => {
     const detailedAnalysisData = [];
-    const normalizedWeights = weights.map(w => w / 100);
+    const normalizedWeights = weights.map((w) => w / 100);
 
     Object.keys(courseAttainmentSummaryData).forEach((co, index) => {
       const coData = courseAttainmentSummaryData[co];
@@ -141,19 +141,19 @@ const UploadedFilesPage = () => {
         attainmentLevel: 0,
         indirectAssessment: indirectAttainment,
         overallAttainment: 0,
-        overallPercentage: 0
+        overallPercentage: 0,
       };
 
       let directAssessmentNumerator = 0;
       let directAssessmentDenominator = 0;
-      
+
       componentNames.forEach((component, i) => {
         const componentLevel = coData[component] || 0;
         rowData.components[component] = {
           value: componentLevel,
-          weight: normalizedWeights[i]
+          weight: normalizedWeights[i],
         };
-        
+
         if (componentLevel > 0) {
           directAssessmentNumerator += componentLevel * normalizedWeights[i];
           directAssessmentDenominator += normalizedWeights[i];
@@ -161,10 +161,12 @@ const UploadedFilesPage = () => {
       });
 
       if (directAssessmentDenominator > 0) {
-        rowData.attainmentLevel = directAssessmentNumerator / directAssessmentDenominator;
+        rowData.attainmentLevel =
+          directAssessmentNumerator / directAssessmentDenominator;
       }
 
-      rowData.overallAttainment = (0.8 * rowData.attainmentLevel) + (0.2 * indirectAttainment);
+      rowData.overallAttainment =
+        0.8 * rowData.attainmentLevel + 0.2 * indirectAttainment;
       rowData.overallPercentage = (rowData.overallAttainment / 3) * 100;
 
       detailedAnalysisData.push(rowData);
@@ -173,248 +175,263 @@ const UploadedFilesPage = () => {
     return detailedAnalysisData;
   };
 
-  const downloadAllSheetsAsExcel = () => {
-    const workbook = XLSX.utils.book_new();
-    const normalizedWeights = weights.map(w => w / 100);
+  const captureChartImage = async () => {
+    const chartElement = document.getElementById("co-attainment-chart");
+    if (!chartElement) return null;
+  
+    try {
+      // Ensure white background for the capture
+      const dataUrl = await toPng(chartElement, {
+        backgroundColor: '#FFFFFF', // White background
+        quality: 1 // Highest quality
+      });
+      
+      return dataUrl;
+    } catch (error) {
+      console.error("Error capturing chart:", error);
+      return null;
+    }
+  };
 
+  const downloadAllSheetsAsExcel = async () => {
+    const ExcelJS = await import("exceljs");
+    const workbook = new ExcelJS.Workbook();
+    const normalizedWeights = weights.map((w) => w / 100);
+    const chartImage = await captureChartImage();
+
+    // Create a function to add a worksheet with data
+    const addWorksheet = (workbook, sheetName, data) => {
+      const worksheet = workbook.addWorksheet(sheetName);
+      data.forEach((row) => {
+        worksheet.addRow(row);
+      });
+      return worksheet;
+    };
+
+    // Process each sheet
     Object.keys(processedData).forEach((sheetName) => {
       const sheetData = processedData[sheetName];
       const coKeys = Object.keys(sheetData.coData);
-  
-      // 1. SHEET DATA
-      const headers = [
-        "Roll No",
-        "Name",
-        ...coKeys.map((co) => `Total of ${co}`),
-        "Total Marks",
-      ];
-      const dataRows = [];
-  
-      for (let i = 1; i < sheetData.studentNames.length; i++) {
-        const row = [
-          sheetData.rollNumbers[i] || "N/A",
-          sheetData.studentNames[i] || "N/A",
-          ...coKeys.map((co) => sheetData.coData[co][i + 1] || "0"),
-          sheetData.totalMarks[i + 1] || "0",
-        ];
-        dataRows.push(row);
-      }
-  
-      const sheetSection = [["Sheet Data"], headers, ...dataRows];
-  
-      // 2. CO ATTAINMENT SUMMARY
-      const attainmentSummary = [["CO Attainment Summary"]];
-      const summaryHeaders = ["", ...coKeys];
-      attainmentSummary.push(summaryHeaders);
-  
-      const totalMarksRow = [
-        "Marks",
-        ...coKeys.map((co) => sheetData.coData[co][1] || 0),
-      ];
-  
-      const thresholdRow = ["Threshold %", ...coKeys.map(() => threshold)];
-  
-      const thresholdMarksRow = [
-        "Threshold Marks",
+
+      // Prepare data for this sheet
+      const sheetDataRows = [
+        ["Sheet Data"],
+        [
+          "Roll No",
+          "Name",
+          ...coKeys.map((co) => `Total of ${co}`),
+          "Total Marks",
+        ],
+        ...Array.from({ length: sheetData.studentNames.length - 1 }, (_, i) => [
+          sheetData.rollNumbers[i + 1] || "N/A",
+          sheetData.studentNames[i + 1] || "N/A",
+          ...coKeys.map((co) => sheetData.coData[co][i + 2] || "0"),
+          sheetData.totalMarks[i + 2] || "0",
+        ]),
+        [],
+        [],
+        ["CO Attainment Summary"],
+        ["", ...coKeys],
+        ["Marks", ...coKeys.map((co) => sheetData.coData[co][1] || 0)],
+        ["Threshold %", ...coKeys.map(() => threshold)],
+        [
+          "Threshold Marks",
+          ...coKeys.map((co) => {
+            const marks = sheetData.coData[co][1] || 0;
+            return marks === 0 ? 0 : (marks * (threshold / 100)).toFixed(2);
+          }),
+        ],
+        [
+          "Students ≥ Threshold",
+          ...coKeys.map((co) => {
+            const marks = sheetData.coData[co][1] || 0;
+            if (marks === 0) return 0;
+            const thresholdMarks = marks * (threshold / 100);
+            return sheetData.coData[co]
+              .slice(2)
+              .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
+          }),
+        ],
+        [
+          "Total Students",
+          ...coKeys.map(() => sheetData.studentNames.length - 1),
+        ],
+        [
+          "Percentage Attainment",
+          ...coKeys.map((co) => {
+            const marks = sheetData.coData[co][1] || 0;
+            if (marks === 0) return 0;
+            const thresholdMarks = marks * (threshold / 100);
+            const above = sheetData.coData[co]
+              .slice(2)
+              .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
+            const total = sheetData.studentNames.length - 1;
+            return total > 0 ? ((above / total) * 100).toFixed(2) : "0.00";
+          }),
+        ],
+        [
+          "Attainment Level",
+          ...coKeys.map((co) => {
+            const marks = sheetData.coData[co][1] || 0;
+            if (marks === 0) return 0;
+            const thresholdMarks = marks * (threshold / 100);
+            const above = sheetData.coData[co]
+              .slice(2)
+              .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
+            const total = sheetData.studentNames.length - 1;
+            const perc = total > 0 ? (above / total) * 100 : 0;
+            if (perc >= 80) return 3;
+            if (perc <= 40 && perc > 0) return 1;
+            if (perc > 40 && perc < 80) return 2;
+            return 0;
+          }),
+        ],
+        [],
+        [],
+        ["CO Attainment Levels"],
+        ["CO", "Attainment Level"],
         ...coKeys.map((co) => {
           const marks = sheetData.coData[co][1] || 0;
-          return marks === 0 ? 0 : (marks * (threshold / 100)).toFixed(2);
-        }),
-      ];
-  
-      const studentsAboveThresholdRow = [
-        "Students ≥ Threshold",
-        ...coKeys.map((co) => {
-          const marks = sheetData.coData[co][1] || 0;
-          if (marks === 0) return 0;
-          const thresholdMarks = marks * (threshold / 100);
-          return sheetData.coData[co]
-            .slice(2)
-            .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
-        }),
-      ];
-  
-      const totalStudentsRow = [
-        "Total Students",
-        ...coKeys.map(() => sheetData.studentNames.length - 1),
-      ];
-  
-      const percentageRow = [
-        "Percentage Attainment",
-        ...coKeys.map((co) => {
-          const marks = sheetData.coData[co][1] || 0;
-          if (marks === 0) return 0;
-          const thresholdMarks = marks * (threshold / 100);
-          const above = sheetData.coData[co]
-            .slice(2)
-            .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
-          const total = sheetData.studentNames.length - 1;
-          return total > 0 ? ((above / total) * 100).toFixed(2) : "0.00";
-        }),
-      ];
-  
-      const levelRow = [
-        "Attainment Level",
-        ...coKeys.map((co) => {
-          const marks = sheetData.coData[co][1] || 0;
-          if (marks === 0) return 0;
+          if (marks === 0) return [co, 0];
           const thresholdMarks = marks * (threshold / 100);
           const above = sheetData.coData[co]
             .slice(2)
             .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
           const total = sheetData.studentNames.length - 1;
           const perc = total > 0 ? (above / total) * 100 : 0;
-          if (perc >= 80) return 3;
-          if (perc <= 40 && perc > 0) return 1;
-          if (perc > 40 && perc < 80) return 2;
-          return 0;
+          let level = 0;
+          if (perc >= 80) level = 3;
+          else if (perc <= 40 && perc > 0) level = 1;
+          else if (perc > 40 && perc < 80) level = 2;
+          return [co, level];
         }),
       ];
-  
-      attainmentSummary.push(
-        totalMarksRow,
-        thresholdRow,
-        thresholdMarksRow,
-        studentsAboveThresholdRow,
-        totalStudentsRow,
-        percentageRow,
-        levelRow
-      );
-  
-      // 3. CO LEVEL SUMMARY
-      const levelSummary = [["CO Attainment Levels"], ["CO", "Attainment Level"]];
-      coKeys.forEach((co) => {
-        const marks = sheetData.coData[co][1] || 0;
-        if (marks === 0) {
-          levelSummary.push([co, 0]);
-          return;
-        }
-        const thresholdMarks = marks * (threshold / 100);
-        const above = sheetData.coData[co]
-          .slice(2)
-          .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
-        const total = sheetData.studentNames.length - 1;
-        const perc = total > 0 ? (above / total) * 100 : 0;
-        let level = 0;
-        if (perc >= 80) level = 3;
-        else if (perc <= 40 && perc > 0) level = 1;
-        else if (perc > 40 && perc < 80) level = 2;
-  
-        levelSummary.push([co, level]);
-      });
 
-      const finalSheet = [
-        ...sheetSection,
-        [],
-        [],
-        ...attainmentSummary,
-        [],
-        [],
-        ...levelSummary,
-      ];
-  
-      const worksheet = XLSX.utils.aoa_to_sheet(finalSheet);
-      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      addWorksheet(workbook, sheetName, sheetDataRows);
     });
 
     // Create Detailed CO Analysis sheet
     const detailedAnalysis = getDetailedAnalysisData();
-    const detailedCOAnalysisSheet = [];
-
-    // Add header information
-    detailedCOAnalysisSheet.push(["THE LNMIIT JAIPUR"]);
-    detailedCOAnalysisSheet.push([`Department of ${branchName}`]);
-    detailedCOAnalysisSheet.push(["Attainment of CO's"]);
-    detailedCOAnalysisSheet.push([]);
-    detailedCOAnalysisSheet.push([
-      `Program: ${branchName}`,
-      `${courseName}`,
-      `Class: ${className}`,
-      `Semester: ${semester}`,
-      `Academic Year: ${academicYear}`
-    ]);
-    detailedCOAnalysisSheet.push([], []);
-
-    // Create table headers
-    const tableHeaders = [
-      "Sr. No.",
-      "CO Statement",
-      ...componentNames,
-      "Attainment Level",
-      "Indirect Assessment",
-      "Overall Attainment on Scale of 3",
-      "Overall Percentage Attainment"
-    ];
-    detailedCOAnalysisSheet.push(tableHeaders);
-
-    // Add weightage row
-    const weightageRow = [
-      "",
-      "Weightage",
-      ...weights.map(w => `${(w/100).toFixed(3)}`),
-      "",
-      "",
-      "",
-      ""
-    ];
-    detailedCOAnalysisSheet.push(weightageRow);
-
-    // Add data rows
-    detailedAnalysis.forEach(row => {
-      detailedCOAnalysisSheet.push([
+    const detailedCOAnalysisSheet = [
+      ["THE LNMIIT JAIPUR"],
+      [`Department of ${branchName}`],
+      ["Attainment of CO's"],
+      [],
+      [
+        `Program: ${branchName}`,
+        `${courseName}`,
+        `Class: ${className}`,
+        `Semester: ${semester}`,
+        `Academic Year: ${academicYear}`,
+      ],
+      [],
+      [],
+      [
+        "Sr. No.",
+        "CO Statement",
+        ...componentNames,
+        "Attainment Level",
+        "Indirect Assessment",
+        "Overall Attainment on Scale of 3",
+        "Overall Percentage Attainment",
+      ],
+      [
+        "",
+        "Weightage",
+        ...weights.map((w) => `${(w / 100).toFixed(3)}`),
+        "",
+        "",
+        "",
+        "",
+      ],
+      ...detailedAnalysis.map((row) => [
         row.co,
         row.statement,
-        ...componentNames.map(comp => row.components[comp]?.value || 0),
+        ...componentNames.map((comp) => row.components[comp]?.value || 0),
         row.attainmentLevel.toFixed(2),
         row.indirectAssessment.toFixed(2),
         row.overallAttainment.toFixed(2),
-        `${row.overallPercentage.toFixed(2)}%`
-      ]);
-    });
+        `${row.overallPercentage.toFixed(2)}%`,
+      ]),
+      [],
+      [],
+      ["Attainment Targets"],
+      ["Target (%)", "CO"],
+      ...detailedAnalysis.map((row) => [threshold, row.co]),
+      [],
+      [],
+      ["Observations"],
+      [
+        `1. ${
+          detailedAnalysis.filter((row) => row.overallPercentage >= threshold)
+            .length > 0
+            ? `COs (${detailedAnalysis
+                .filter((row) => row.overallPercentage >= threshold)
+                .map((row) => row.co)
+                .join(
+                  ", "
+                )}) with attainment ≥ ${threshold}% indicate GOOD performance.`
+            : `No COs met or exceeded the ${threshold}% target`
+        }`,
+      ],
+      [
+        `2. ${
+          detailedAnalysis.filter((row) => row.overallPercentage < threshold)
+            .length > 0
+            ? `COs (${detailedAnalysis
+                .filter((row) => row.overallPercentage < threshold)
+                .map((row) => row.co)
+                .join(
+                  ", "
+                )}) with attainment < ${threshold}% suggest areas needing improvement.`
+            : `All COs met or exceeded the ${threshold}% target`
+        }`,
+      ],
+      [],
+      [],
+      ["CO Attainment Chart:"],
+      [], // Placeholder for image
+    ];
 
-    // Add empty rows before new sections
-  detailedCOAnalysisSheet.push([], [], []);
-
-  // Add Attainment Targets table
-  detailedCOAnalysisSheet.push(["Attainment Targets"]);
-  detailedCOAnalysisSheet.push(["Target (%)", "CO"]);
-  detailedAnalysis.forEach(row => {
-    detailedCOAnalysisSheet.push([threshold, row.co]);
-  });
-
-  // Add empty rows before observations
-  detailedCOAnalysisSheet.push([], [], []);
-
-  // Add Observations
-  detailedCOAnalysisSheet.push(["Observations"]);
-  const highAttainmentCOs = detailedAnalysis.filter(row => row.overallPercentage >= threshold);
-  const lowAttainmentCOs = detailedAnalysis.filter(row => row.overallPercentage < threshold);
+    const detailedWorksheet = addWorksheet(
+      workbook,
+      "Detailed CO Analysis",
+      detailedCOAnalysisSheet
+    );
+    // Add the chart image if available
+    if (chartImage) {
+      try {
+        const imageId = workbook.addImage({
+          base64: chartImage.split(',')[1],
+          extension: 'png'
+        });
   
-  detailedCOAnalysisSheet.push([
-    `1. ${highAttainmentCOs.length > 0 ? 
-      `COs (${highAttainmentCOs.map(row => row.co).join(', ')}) with attainment ≥ ${threshold}% indicate GOOD performance.` : 
-      `No COs met or exceeded the ${threshold}% target`}`
-  ]);
-  detailedCOAnalysisSheet.push([
-    `2. ${lowAttainmentCOs.length > 0 ? 
-      `COs (${lowAttainmentCOs.map(row => row.co).join(', ')}) with attainment < ${threshold}% suggest areas needing improvement.` : 
-      `All COs met or exceeded the ${threshold}% target`}`
-  ]);
-
-  // Note: The chart cannot be directly included in Excel, but the data is already present
-  // for users to create their own chart in Excel
-
-    const detailedWorksheet = XLSX.utils.aoa_to_sheet(detailedCOAnalysisSheet);
-    XLSX.utils.book_append_sheet(workbook, detailedWorksheet, "Detailed CO Analysis");
+        // Calculate position - after all content with some spacing
+        const imageRow = detailedCOAnalysisSheet.length + 3;
+        
+        detailedWorksheet.addImage(imageId, {
+          tl: { col: 0, row: imageRow }, // Start at column B
+          ext: { width: 600, height: 350 },
+          editAs: 'oneCell'
+        });
+  
+        // Merge cells to create space for the image
+        detailedWorksheet.mergeCells(`B${imageRow}:G${imageRow + 15}`);
+        
+      } catch (error) {
+        console.error("Error adding image to Excel:", error);
+      }
+    }
 
     // Generate and download the Excel file
-    const excelBuffer = XLSX.write(workbook, {
-      bookType: "xlsx",
-      type: "array",
+    const buffer = await workbook.xlsx.writeBuffer();
+    const data = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
-
-    const data = new Blob([excelBuffer], { type: "application/octet-stream" });
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    const timestamp = new Date()
+      .toISOString()
+      .slice(0, 19)
+      .replace(/[:T]/g, "-");
     saveAs(data, `Combined_CO_Analysis_${threshold}perc_${timestamp}.xlsx`);
   };
 
@@ -773,28 +790,36 @@ const UploadedFilesPage = () => {
 
               <Divider my={4} />
 
-              <Button 
+              <Button
                 onClick={() => setShowDetailedAnalysis(!showDetailedAnalysis)}
-                colorScheme="teal" 
+                colorScheme="teal"
                 mt={4}
-                mb={6} mr={4}
+                mb={6}
+                mr={4}
               >
-                {showDetailedAnalysis ? "Hide Detailed CO Analysis" : "Show Detailed CO Analysis"}
+                {showDetailedAnalysis
+                  ? "Hide Detailed CO Analysis"
+                  : "Show Detailed CO Analysis"}
               </Button>
 
               {showDetailedAnalysis && (
-  <Box mt={8} overflowX="auto">
-    <Heading size="xl" mb={2} color="gray.700">
-      Detailed CO Analysis
-    </Heading>
-    <Divider my={4} />
-    
-    <Table size="sm" bg={tableBg} borderRadius="xl" boxShadow="md">
+                <Box mt={8} overflowX="auto">
+                  <Heading size="xl" mb={2} color="gray.700">
+                    Detailed CO Analysis
+                  </Heading>
+                  <Divider my={4} />
+
+                  <Table
+                    size="sm"
+                    bg={tableBg}
+                    borderRadius="xl"
+                    boxShadow="md"
+                  >
                     <Thead bg={headerBg}>
                       <Tr>
                         <Th color={headerColor}>CO</Th>
                         <Th color={headerColor}>Statement</Th>
-                        {componentNames.map(component => (
+                        {componentNames.map((component) => (
                           <Th key={component} color={headerColor}>
                             {component}
                           </Th>
@@ -809,7 +834,7 @@ const UploadedFilesPage = () => {
                         <Th></Th>
                         {componentNames.map((component, i) => (
                           <Th key={`weight-${i}`} color={headerColor}>
-                            Weight: {(weights[i]/100).toFixed(3)}
+                            Weight: {(weights[i] / 100).toFixed(3)}
                           </Th>
                         ))}
                         <Th></Th>
@@ -823,7 +848,7 @@ const UploadedFilesPage = () => {
                         <Tr key={index}>
                           <Td fontWeight="bold">{row.co}</Td>
                           <Td>{row.statement}</Td>
-                          {componentNames.map(component => (
+                          {componentNames.map((component) => (
                             <Td key={`${row.co}-${component}`}>
                               {row.components[component]?.value || 0}
                             </Td>
@@ -837,85 +862,127 @@ const UploadedFilesPage = () => {
                     </Tbody>
                   </Table>
 
-    {/* Add Threshold Table */}
-    <Box mt={8}>
-      <Heading size="md" mb={4} color="gray.700">
-        Attainment Targets
-      </Heading>
-      <Table size="sm" bg={tableBg} borderRadius="xl" boxShadow="md" maxW="300px">
-        <Thead bg={headerBg}>
-          <Tr>
-            <Th color={headerColor}>Target (%)</Th>
-            <Th color={headerColor}>CO</Th>
-          </Tr>
-        </Thead>
-        <Tbody>
-          {getDetailedAnalysisData().map((row, index) => (
-            <Tr key={`target-${index}`}>
-              <Td>{threshold}</Td>
-              <Td>{row.co}</Td>
-            </Tr>
-          ))}
-        </Tbody>
-      </Table>
-    </Box>
+                  {/* Add Threshold Table */}
+                  <Box mt={8}>
+                    <Heading size="md" mb={4} color="gray.700">
+                      Attainment Targets
+                    </Heading>
+                    <Table
+                      size="sm"
+                      bg={tableBg}
+                      borderRadius="xl"
+                      boxShadow="md"
+                      maxW="300px"
+                    >
+                      <Thead bg={headerBg}>
+                        <Tr>
+                          <Th color={headerColor}>Target (%)</Th>
+                          <Th color={headerColor}>CO</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {getDetailedAnalysisData().map((row, index) => (
+                          <Tr key={`target-${index}`}>
+                            <Td>{threshold}</Td>
+                            <Td>{row.co}</Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  </Box>
 
-     {/* Add Observations */}
-     <Box mt={8}>
-      <Heading size="md" mb={4} color="gray.700">
-        Observations
-      </Heading>
-      <Card bg={tableBg} p={4}>
-        {(() => {
-          const analysisData = getDetailedAnalysisData();
-          const highAttainmentCOs = analysisData.filter(row => row.overallPercentage >= threshold);
-          const lowAttainmentCOs = analysisData.filter(row => row.overallPercentage < threshold);
-          
-          return (
-            <>
-              <Text mb={2}>
-                {highAttainmentCOs.length > 0 ? (
-                  `1. COs (${highAttainmentCOs.map(row => row.co).join(', ')}) with attainment ≥ ${threshold}% ` +
-                  `(ranging from ${Math.min(...highAttainmentCOs.map(row => row.overallPercentage)).toFixed(1)}% to ` +
-                  `${Math.max(...highAttainmentCOs.map(row => row.overallPercentage)).toFixed(1)}%) indicate GOOD performance.`
-                ) : (
-                  `1. No COs met or exceeded the ${threshold}% target`
-                )}
-              </Text>
-              <Text>
-                {lowAttainmentCOs.length > 0 ? (
-                  `2. COs (${lowAttainmentCOs.map(row => row.co).join(', ')}) with attainment < ${threshold}% ` +
-                  `(ranging from ${Math.min(...lowAttainmentCOs.map(row => row.overallPercentage)).toFixed(1)}% to ` +
-                  `${Math.max(...lowAttainmentCOs.map(row => row.overallPercentage)).toFixed(1)}%) suggest areas needing improvement.`
-                ) : (
-                  `2. All COs met or exceeded the ${threshold}% target`
-                )}
-              </Text>
-            </>
-          );
-        })()}
-      </Card>
-    </Box>
+                  {/* Add Observations */}
+                  <Box mt={8}>
+                    <Heading size="md" mb={4} color="gray.700">
+                      Observations
+                    </Heading>
+                    <Card bg={tableBg} p={4}>
+                      {(() => {
+                        const analysisData = getDetailedAnalysisData();
+                        const highAttainmentCOs = analysisData.filter(
+                          (row) => row.overallPercentage >= threshold
+                        );
+                        const lowAttainmentCOs = analysisData.filter(
+                          (row) => row.overallPercentage < threshold
+                        );
 
-    {/* Add Bar Graph */}
-    <Box mt={8}>
-      <Heading size="md" mb={4} color="gray.700">
-        Attainment vs Target
-      </Heading>
-      <Card bg={tableBg} p={4}>
-        <Box height="300px">
-          <COAttainmentChart 
-            data={getDetailedAnalysisData()} 
-            threshold={threshold} 
-          />
-        </Box>
-      </Card>
-    </Box>
-  </Box>
-)}
+                        return (
+                          <>
+                            <Text mb={2}>
+                              {highAttainmentCOs.length > 0
+                                ? `1. COs (${highAttainmentCOs
+                                    .map((row) => row.co)
+                                    .join(
+                                      ", "
+                                    )}) with attainment ≥ ${threshold}% ` +
+                                  `(ranging from ${Math.min(
+                                    ...highAttainmentCOs.map(
+                                      (row) => row.overallPercentage
+                                    )
+                                  ).toFixed(1)}% to ` +
+                                  `${Math.max(
+                                    ...highAttainmentCOs.map(
+                                      (row) => row.overallPercentage
+                                    )
+                                  ).toFixed(1)}%) indicate GOOD performance.`
+                                : `1. No COs met or exceeded the ${threshold}% target`}
+                            </Text>
+                            <Text>
+                              {lowAttainmentCOs.length > 0
+                                ? `2. COs (${lowAttainmentCOs
+                                    .map((row) => row.co)
+                                    .join(
+                                      ", "
+                                    )}) with attainment < ${threshold}% ` +
+                                  `(ranging from ${Math.min(
+                                    ...lowAttainmentCOs.map(
+                                      (row) => row.overallPercentage
+                                    )
+                                  ).toFixed(1)}% to ` +
+                                  `${Math.max(
+                                    ...lowAttainmentCOs.map(
+                                      (row) => row.overallPercentage
+                                    )
+                                  ).toFixed(
+                                    1
+                                  )}%) suggest areas needing improvement.`
+                                : `2. All COs met or exceeded the ${threshold}% target`}
+                            </Text>
+                          </>
+                        );
+                      })()}
+                    </Card>
+                  </Box>
 
-              <Button onClick={downloadAllSheetsAsExcel} colorScheme="green"  mt={4}
-                mb={6} overflowX="auto">
+                  {/* Add Bar Graph */}
+                  <Box mt={8}>
+                    <Heading size="md" mb={4} color="gray.700">
+                      Attainment vs Target
+                    </Heading>
+                    <Card bg={tableBg} p={4}>
+                      <Box
+                        id="co-attainment-chart"
+                        height="400px"
+                        position="relative" // Add this
+                        zIndex="1" // Add this
+                      >
+                        <COAttainmentChart
+                          data={getDetailedAnalysisData()}
+                          threshold={threshold}
+                        />
+                      </Box>
+                    </Card>
+                  </Box>
+                </Box>
+              )}
+
+              <Button
+                onClick={downloadAllSheetsAsExcel}
+                colorScheme="green"
+                mt={4}
+                mb={6}
+                overflowX="auto"
+              >
                 Download CO Analysis as Excel
               </Button>
             </>
