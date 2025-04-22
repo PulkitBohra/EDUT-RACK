@@ -35,20 +35,21 @@ const UploadedFilesPage = () => {
   const [processedData, setProcessedData] = useState({});
   const [expandedSheet, setExpandedSheet] = useState(null);
   const [threshold, setThreshold] = useState(50); // Default threshold value
+  const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false);
+  const [courseAttainmentSummaryData, setCourseAttainmentSummaryData] = useState({});
 
   const formData = location.state?.formData || {};
   const componentNames = location.state?.componentNames || [];
   const weights = location.state?.weights || [];
   const coStatements = location.state?.coStatements || [];
 
-   // Extract the specific values we need
+  // Extract the specific values we need
   const branchName = formData?.Branch_name || "Branch Not Provided";
   const courseName = formData?.Course_name || "Course Not Provided";
   const className = formData?.Class || "Class Not Provided";
   const semester = formData?.Semester || "Semester Not Provided";
   const academicYear = formData?.AcademicYear || "Academic Year Not Provided";
   const indirectAttainment = formData?.IndirectAttainment || 0;
-  
 
   const tableBg = useColorModeValue("white", "gray.700");
   const headerBg = useColorModeValue("blue.500", "blue.300");
@@ -58,6 +59,7 @@ const UploadedFilesPage = () => {
   useEffect(() => {
     const processFiles = () => {
       const finalData = {};
+      const attainmentData = {};
 
       for (const [sheetName, coData] of Object.entries(rawFileContents)) {
         let studentNames = [];
@@ -86,29 +88,91 @@ const UploadedFilesPage = () => {
           rollNumbers,
           totalMarks,
         };
+
+        // Calculate attainment levels for each CO
+        const coKeys = Object.keys(actualCOs);
+        coKeys.forEach((co) => {
+          const marks = actualCOs[co][1] || 0;
+          if (marks === 0) {
+            if (!attainmentData[co]) attainmentData[co] = {};
+            attainmentData[co][sheetName] = 0;
+            return;
+          }
+          const thresholdMarks = marks * (threshold / 100);
+          const above = actualCOs[co]
+            .slice(2)
+            .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
+          const total = studentNames.length - 1;
+          const perc = total > 0 ? (above / total) * 100 : 0;
+          let level = 0;
+          if (perc >= 80) level = 3;
+          else if (perc <= 40 && perc > 0) level = 1;
+          else if (perc > 40 && perc < 80) level = 2;
+
+          if (!attainmentData[co]) attainmentData[co] = {};
+          attainmentData[co][sheetName] = level;
+        });
       }
 
       setProcessedData(finalData);
+      setCourseAttainmentSummaryData(attainmentData);
     };
 
     processFiles();
-  }, [rawFileContents]);
+  }, [rawFileContents, threshold]);
 
   const toggleSheetDetails = (sheetName) => {
     setExpandedSheet((prev) => (prev === sheetName ? null : sheetName));
   };
 
+  const getDetailedAnalysisData = () => {
+    const detailedAnalysisData = [];
+    const normalizedWeights = weights.map(w => w / 100);
+
+    Object.keys(courseAttainmentSummaryData).forEach((co, index) => {
+      const coData = courseAttainmentSummaryData[co];
+      const rowData = {
+        co: `CO${index + 1}`,
+        statement: coStatements[index] || `CO Statement for ${co}`,
+        components: {},
+        attainmentLevel: 0,
+        indirectAssessment: indirectAttainment,
+        overallAttainment: 0,
+        overallPercentage: 0
+      };
+
+      let directAssessmentNumerator = 0;
+      let directAssessmentDenominator = 0;
+      
+      componentNames.forEach((component, i) => {
+        const componentLevel = coData[component] || 0;
+        rowData.components[component] = {
+          value: componentLevel,
+          weight: normalizedWeights[i]
+        };
+        
+        if (componentLevel > 0) {
+          directAssessmentNumerator += componentLevel * normalizedWeights[i];
+          directAssessmentDenominator += normalizedWeights[i];
+        }
+      });
+
+      if (directAssessmentDenominator > 0) {
+        rowData.attainmentLevel = directAssessmentNumerator / directAssessmentDenominator;
+      }
+
+      rowData.overallAttainment = (0.8 * rowData.attainmentLevel) + (0.2 * indirectAttainment);
+      rowData.overallPercentage = (rowData.overallAttainment / 3) * 100;
+
+      detailedAnalysisData.push(rowData);
+    });
+
+    return detailedAnalysisData;
+  };
+
   const downloadAllSheetsAsExcel = () => {
     const workbook = XLSX.utils.book_new();
-  const courseAttainmentSummaryData = {};
-  const formData = location.state?.formData || {};
-  const componentNames = location.state?.componentNames || [];
-  const weights = location.state?.weights || [];
-  const coStatements = location.state?.coStatements || [];
-  
-  // Normalize weights to be between 0 and 1
-  const normalizedWeights = weights.map(w => w / 100);
-    
+    const normalizedWeights = weights.map(w => w / 100);
 
     Object.keys(processedData).forEach((sheetName) => {
       const sheetData = processedData[sheetName];
@@ -216,7 +280,6 @@ const UploadedFilesPage = () => {
   
       // 3. CO LEVEL SUMMARY
       const levelSummary = [["CO Attainment Levels"], ["CO", "Attainment Level"]];
-      const coLevelMap = {};
       coKeys.forEach((co) => {
         const marks = sheetData.coData[co][1] || 0;
         if (marks === 0) {
@@ -235,14 +298,8 @@ const UploadedFilesPage = () => {
         else if (perc > 40 && perc < 80) level = 2;
   
         levelSummary.push([co, level]);
-
-        coLevelMap[co] = level;
-        if (!courseAttainmentSummaryData[co])
-        courseAttainmentSummaryData[co] = {};
-      courseAttainmentSummaryData[co][sheetName] = level;
       });
 
-      
       const finalSheet = [
         ...sheetSection,
         [],
@@ -257,144 +314,74 @@ const UploadedFilesPage = () => {
       XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     });
 
-  // Now create the Detailed CO Analysis sheet
-const detailedCOAnalysisSheet = [];
+    // Create Detailed CO Analysis sheet
+    const detailedAnalysis = getDetailedAnalysisData();
+    const detailedCOAnalysisSheet = [];
 
-// Add header information
-detailedCOAnalysisSheet.push(["THE LNMIIT JAIPUR"]);
-detailedCOAnalysisSheet.push([`Department of ${branchName}`]);
-detailedCOAnalysisSheet.push(["Attainment of CO's"]);
-detailedCOAnalysisSheet.push([]); // Empty row
+    // Add header information
+    detailedCOAnalysisSheet.push(["THE LNMIIT JAIPUR"]);
+    detailedCOAnalysisSheet.push([`Department of ${branchName}`]);
+    detailedCOAnalysisSheet.push(["Attainment of CO's"]);
+    detailedCOAnalysisSheet.push([]);
+    detailedCOAnalysisSheet.push([
+      `Program: ${branchName}`,
+      `${courseName}`,
+      `Class: ${className}`,
+      `Semester: ${semester}`,
+      `Academic Year: ${academicYear}`
+    ]);
+    detailedCOAnalysisSheet.push([], []);
 
-// Add program information row (merged cells in Excel)
-detailedCOAnalysisSheet.push([
-  `Program: ${branchName}`,
-  `${courseName}`,
-  `Class: ${className}`,
-  `Semester: ${semester}`,
-  `Academic Year: ${academicYear}`
-]);
+    // Create table headers
+    const tableHeaders = [
+      "Sr. No.",
+      "CO Statement",
+      ...componentNames,
+      "Attainment Level",
+      "Indirect Assessment",
+      "Overall Attainment on Scale of 3",
+      "Overall Percentage Attainment"
+    ];
+    detailedCOAnalysisSheet.push(tableHeaders);
 
-detailedCOAnalysisSheet.push([], []); // Empty rows
+    // Add weightage row
+    const weightageRow = [
+      "",
+      "Weightage",
+      ...weights.map(w => `${(w/100).toFixed(3)}`),
+      "",
+      "",
+      "",
+      ""
+    ];
+    detailedCOAnalysisSheet.push(weightageRow);
 
+    // Add data rows
+    detailedAnalysis.forEach(row => {
+      detailedCOAnalysisSheet.push([
+        row.co,
+        row.statement,
+        ...componentNames.map(comp => row.components[comp]?.value || 0),
+        row.attainmentLevel.toFixed(2),
+        row.indirectAssessment.toFixed(2),
+        row.overallAttainment.toFixed(2),
+        `${row.overallPercentage.toFixed(2)}%`
+      ]);
+    });
 
-detailedCOAnalysisSheet.push([
-  " ",
-  "",
-  "Direct Assessment",
-]);
+    const detailedWorksheet = XLSX.utils.aoa_to_sheet(detailedCOAnalysisSheet);
+    XLSX.utils.book_append_sheet(workbook, detailedWorksheet, "Detailed CO Analysis");
 
-// Create table headers
-const tableHeaders = [
-  "Sr. No.",
-  "CO Statement",
-  ...componentNames,
-  //"Weightage", // New weightage row
-  "Attainment Level", // New column
-  //"Direct Assessment",
-  "Indirect Assessment",
-  "Overall Attainment on Scale of 3",
-  "Overall Percentage Attainment"
-];
+    // Generate and download the Excel file
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
 
-detailedCOAnalysisSheet.push(tableHeaders);
-
-// Add weightage row right after headers
-const weightageRow = [
-  "", // Empty for Sr. No.
-  "Weightage", // Empty for CO Statement
-  ...weights.map(w => `${(w/100).toFixed(3)}`), // Weightages for each component
-  //"", // Empty for Weightage header
-  "", // Empty for Attainment Level
- // "", // Empty for Direct Assessment
-  "", // Empty for Indirect Assessment
-  "", // Empty for Overall Attainment
-  ""  // Empty for Overall Percentage
-];
-detailedCOAnalysisSheet.push(weightageRow);
-
-// Calculate and add data for each CO
-Object.keys(courseAttainmentSummaryData).forEach((co, index) => {
-  const coData = courseAttainmentSummaryData[co];
-  const rowData = [
-    `CO${index + 1}`, // Sr. No. as CO1, CO2, etc.
-    coStatements[index] || `CO Statement for ${co}`, // CO Statement
-  ];
-
-  // Add component values (Quiz1, Quiz2, etc.)
-  componentNames.forEach(component => {
-    rowData.push(coData[component] || 0);
-  });
-
-  // Add weightage sum (empty cell under weightage header)
-  //rowData.push("");
-
-  // Calculate Direct Assessment (weighted average of components where level > 0)
-  let directAssessmentNumerator = 0;
-  let directAssessmentDenominator = 0;
-  let attainmentLevel = 0;
-  
-  componentNames.forEach((component, i) => {
-    const componentLevel = coData[component] || 0;
-    if (componentLevel > 0) {
-      directAssessmentNumerator += componentLevel * normalizedWeights[i];
-      directAssessmentDenominator += normalizedWeights[i];
-    }
-  });
-
-  if (directAssessmentDenominator > 0) {
-    attainmentLevel = directAssessmentNumerator / directAssessmentDenominator;
-  }
-
-  // Add Attainment Level
-  rowData.push(attainmentLevel.toFixed(2));
-
-  // Add Direct Assessment (same as attainment level in this case)
-  //rowData.push(attainmentLevel.toFixed(2));
-
-  // Add Indirect Assessment
-  rowData.push(indirectAttainment);
-  
-  // Calculate Overall Attainment (80% direct + 20% indirect)
-  const overallAttainment = (0.8 * attainmentLevel) + (0.2 * indirectAttainment);
-  rowData.push(overallAttainment.toFixed(2));
-  
-  // Calculate Overall Percentage Attainment
-  const overallPercentage = (overallAttainment / 3) * 100;
-  rowData.push(`${overallPercentage.toFixed(2)}%`);
-
-  detailedCOAnalysisSheet.push(rowData);
-});
-
-// Add the Detailed CO Analysis sheet to the workbook
-const detailedWorksheet = XLSX.utils.aoa_to_sheet(detailedCOAnalysisSheet);
-
-// Set column widths for better formatting
-const colWidths = [
-  { wch: 50 },  // Sr. No.
-  { wch: 40 },  // CO Statement
-  ...componentNames.map(() => ({ wch: 12 })), // Components
-  { wch: 12 },  // Weightage
-  { wch: 15 },  // Attainment Level
-  { wch: 15 },  // Direct Assessment
-  { wch: 15 },  // Indirect Assessment
-  { wch: 25 },  // Overall Attainment
-  { wch: 25 },  // Overall Percentage
-];
-detailedWorksheet['!cols'] = colWidths;
-
-XLSX.utils.book_append_sheet(workbook, detailedWorksheet, "Detailed CO Analysis");
-  // Generate and download the Excel file
-  const excelBuffer = XLSX.write(workbook, {
-    bookType: "xlsx",
-    type: "array",
-  });
-
-  const data = new Blob([excelBuffer], { type: "application/octet-stream" });
-  const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-  saveAs(data, `Combined_CO_Analysis_${threshold}perc_${timestamp}.xlsx`);
-};
-  
+    const data = new Blob([excelBuffer], { type: "application/octet-stream" });
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    saveAs(data, `Combined_CO_Analysis_${threshold}perc_${timestamp}.xlsx`);
+  };
 
   return (
     <>
@@ -625,9 +612,6 @@ XLSX.utils.book_append_sheet(workbook, detailedWorksheet, "Detailed CO Analysis"
                                   (mark) => parseFloat(mark) >= thresholdmarks
                                 ).length;
                             }
-                            // else{
-                            //     above=0;
-                            // }
                             return <Td key={`above-${idx}`}>{above}</Td>;
                           }
                         )}
@@ -657,9 +641,6 @@ XLSX.utils.book_append_sheet(workbook, detailedWorksheet, "Detailed CO Analysis"
                                   (mark) => parseFloat(mark) >= thresholdmarks
                                 ).length;
                             }
-                            // else{
-                            //     above=0;
-                            // }
                             const total =
                               processedData[expandedSheet].studentNames.length -
                               1;
@@ -687,9 +668,6 @@ XLSX.utils.book_append_sheet(workbook, detailedWorksheet, "Detailed CO Analysis"
                                   (mark) => parseFloat(mark) >= thresholdmarks
                                 ).length;
                             }
-                            // else{
-                            //     above=0;
-                            // }
                             const total =
                               processedData[expandedSheet].studentNames.length -
                               1;
@@ -757,12 +735,81 @@ XLSX.utils.book_append_sheet(workbook, detailedWorksheet, "Detailed CO Analysis"
                   </Table>
                 </Box>
               )}
+
+              <Divider my={4} />
+
+              <Button 
+                onClick={() => setShowDetailedAnalysis(!showDetailedAnalysis)}
+                colorScheme="teal" 
+                mt={4}
+                mb={6} mr={4}
+              >
+                {showDetailedAnalysis ? "Hide Detailed CO Analysis" : "Show Detailed CO Analysis"}
+              </Button>
+
+              {showDetailedAnalysis && (
+                <Box mt={8} overflowX="auto">
+                  <Heading size="xl" mb={2} color="gray.700">
+                    Detailed CO Analysis
+                  </Heading>
+                  <Divider my={4} />
+                  <Table size="sm" bg={tableBg} borderRadius="xl" boxShadow="md">
+                    <Thead bg={headerBg}>
+                      <Tr>
+                        <Th color={headerColor}>CO</Th>
+                        <Th color={headerColor}>Statement</Th>
+                        {componentNames.map(component => (
+                          <Th key={component} color={headerColor}>
+                            {component}
+                          </Th>
+                        ))}
+                        <Th color={headerColor}>Attainment Level</Th>
+                        <Th color={headerColor}>Indirect Assessment</Th>
+                        <Th color={headerColor}>Overall Attainment</Th>
+                        <Th color={headerColor}>Percentage</Th>
+                      </Tr>
+                      <Tr>
+                        <Th></Th>
+                        <Th></Th>
+                        {componentNames.map((component, i) => (
+                          <Th key={`weight-${i}`} color={headerColor}>
+                            Weight: {(weights[i]/100).toFixed(3)}
+                          </Th>
+                        ))}
+                        <Th></Th>
+                        <Th></Th>
+                        <Th></Th>
+                        <Th></Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {getDetailedAnalysisData().map((row, index) => (
+                        <Tr key={index}>
+                          <Td fontWeight="bold">{row.co}</Td>
+                          <Td>{row.statement}</Td>
+                          {componentNames.map(component => (
+                            <Td key={`${row.co}-${component}`}>
+                              {row.components[component]?.value || 0}
+                            </Td>
+                          ))}
+                          <Td>{row.attainmentLevel.toFixed(2)}</Td>
+                          <Td>{row.indirectAssessment.toFixed(2)}</Td>
+                          <Td>{row.overallAttainment.toFixed(2)}</Td>
+                          <Td>{row.overallPercentage.toFixed(2)}%</Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+                </Box>
+              )}
+
+              <Button onClick={downloadAllSheetsAsExcel} colorScheme="green"  mt={4}
+                mb={6} overflowX="auto">
+                Download CO Analysis as Excel
+              </Button>
             </>
           )}
         </motion.div>
-        <Button onClick={downloadAllSheetsAsExcel} colorScheme="green" mt={4}>
-            Download CO Analysis as Excel
-          </Button>
       </Flex>
     </>
   );
