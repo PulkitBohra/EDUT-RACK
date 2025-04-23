@@ -319,90 +319,104 @@ const UploadedFilesPage = () => {
         data.forEach((row, rowIndex) => {
           const excelRow = worksheet.addRow(row);
 
-          if (rowIndex === 0) {
-            excelRow.font = {
-              bold: true,
-              size: 14,
-              color: { argb: colors.headerText },
-            };
-            excelRow.fill = {
-              type: "pattern",
-              pattern: "solid",
-              fgColor: { argb: colors.headerBg },
-            };
-            excelRow.alignment = { horizontal: "center" };
-            if (row.length > 1) {
-              safeMergeCells(worksheet, {
-                top: excelRow.number,
-                left: 1,
-                bottom: excelRow.number,
-                right: row.length
-              });
+          // Style only the cells with content, not the entire row
+          excelRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            if (row[colNumber - 1]) {
+              // Only style cells with content
+              if (rowIndex === 0) {
+                // Header row styling (first row)
+                cell.font = {
+                  bold: true,
+                  size: 14,
+                  color: { argb: colors.headerText },
+                };
+                cell.fill = {
+                  type: "pattern",
+                  pattern: "solid",
+                  fgColor: { argb: colors.headerBg },
+                };
+                cell.alignment = { horizontal: "center" };
+              } else if (
+                row[0] === "CO Attainment Summary" ||
+                row[0] === "CO Attainment Levels" ||
+                row[0] === "Observations"
+              ) {
+                // Section header rows
+                if (colNumber === 1) {
+                  // Only style the first cell
+                  cell.font = {
+                    bold: true,
+                    color: { argb: colors.headerText },
+                  };
+                  cell.fill = {
+                    type: "pattern",
+                    pattern: "solid",
+                    fgColor: { argb: colors.headerBg },
+                  };
+                }
+              } else if (
+                rowIndex > 0 &&
+                row.some(
+                  (cell) => typeof cell === "string" && cell.includes("CO")
+                )
+              ) {
+                // CO rows - apply styling only to cells with content
+                cell.font = { bold: true };
+                cell.fill = {
+                  type: "pattern",
+                  pattern: "solid",
+                  fgColor: { argb: colors.accentBg },
+                };
+              } else if (rowIndex > 0) {
+                // Regular data rows
+                cell.font = { color: { argb: colors.text } };
+                cell.fill = {
+                  type: "pattern",
+                  pattern: "solid",
+                  fgColor: {
+                    argb:
+                      rowIndex % 2 === 0 ? colors.evenRowBg : colors.oddRowBg,
+                  },
+                };
+              }
+
+              // Apply borders to all cells with content
+              cell.border = {
+                top: { style: "thin", color: { argb: colors.border } },
+                left: { style: "thin", color: { argb: colors.border } },
+                bottom: { style: "thin", color: { argb: colors.border } },
+                right: { style: "thin", color: { argb: colors.border } },
+              };
+
+              cell.alignment = {
+                wrapText: true,
+                vertical: "middle",
+                horizontal: "center",
+              };
             }
+          });
+
+          // Handle merging for header rows
+          if (rowIndex === 0 && row.length > 1) {
+            safeMergeCells(worksheet, {
+              top: excelRow.number,
+              left: 1,
+              bottom: excelRow.number,
+              right: row.length,
+            });
           } else if (
-            row[0] === "CO Attainment Summary" ||
-            row[0] === "CO Attainment Levels" ||
-            row[0] === "Observations"
+            (row[0] === "CO Attainment Summary" ||
+              row[0] === "CO Attainment Levels" ||
+              row[0] === "Observations") &&
+            row.length > 1
           ) {
-            // Section header rows
-            excelRow.font = { bold: true, color: { argb: colors.headerText } };
-            excelRow.fill = {
-              type: "pattern",
-              pattern: "solid",
-              fgColor: { argb: colors.headerBg },
-            };
-            if (row.length > 1) {
-              worksheet.mergeCells(
-                `A${excelRow.number}:${String.fromCharCode(
-                  65 + row.length - 1
-                )}${excelRow.number}`
-              );
-            }
-          } else if (
-            rowIndex > 0 &&
-            row.some((cell) => typeof cell === "string" && cell.includes("CO"))
-          ) {
-            // CO rows
-            excelRow.font = { bold: true };
-            excelRow.fill = {
-              type: "pattern",
-              pattern: "solid",
-              fgColor: { argb: colors.accentBg },
-            };
-          } else if (rowIndex > 0) {
-            // Regular data rows
-            excelRow.font = { color: { argb: colors.text } };
-            excelRow.fill = {
-              type: "pattern",
-              pattern: "solid",
-              fgColor: {
-                argb: rowIndex % 2 === 0 ? colors.evenRowBg : colors.oddRowBg,
-              },
-            };
+            safeMergeCells(worksheet, {
+              top: excelRow.number,
+              left: 1,
+              bottom: excelRow.number,
+              right: row.length,
+            });
           }
-        });
-
-        // Set borders for all cells with data
-        worksheet.eachRow((row, rowNumber) => {
-          row.eachCell((cell) => {
-            cell.border = {
-              top: { style: "thin", color: { argb: colors.border } },
-              left: { style: "thin", color: { argb: colors.border } },
-              bottom: { style: "thin", color: { argb: colors.border } },
-              right: { style: "thin", color: { argb: colors.border } },
-            };
-          });
-        });
-
-        // Set wrap text for all cells
-        worksheet.eachRow((row) => {
-          row.eachCell((cell) => {
-            cell.alignment = {
-              wrapText: true,
-              vertical: "middle",
-              horizontal: "center",
-            };
-          });
         });
 
         // Auto-fit columns with a minimum width
@@ -420,109 +434,109 @@ const UploadedFilesPage = () => {
 
       // Process each sheet
       try {
-      Object.keys(processedData).forEach((sheetName) => {
-        const sheetData = processedData[sheetName];
-        const coKeys = Object.keys(sheetData.coData);
+        Object.keys(processedData).forEach((sheetName) => {
+          const sheetData = processedData[sheetName];
+          const coKeys = Object.keys(sheetData.coData);
 
-        const sheetDataRows = [
-          [sheetName],
-          [
-            "Roll No",
-            "Name",
-            ...coKeys.map((co) => `Total of ${co}`),
-            "Total Marks",
-          ],
-          ...Array.from(
-            { length: sheetData.studentNames.length - 1 },
-            (_, i) => [
-              sheetData.rollNumbers[i + 1] || "N/A",
-              sheetData.studentNames[i + 1] || "N/A",
-              ...coKeys.map((co) => sheetData.coData[co][i + 2] || "0"),
-              sheetData.totalMarks[i + 2] || "0",
-            ]
-          ),
-          [],
-          [],
-          ["CO Attainment Summary"],
-          ["", ...coKeys],
-          ["Marks", ...coKeys.map((co) => sheetData.coData[co][1] || 0)],
-          ["Threshold %", ...coKeys.map(() => threshold)],
-          [
-            "Threshold Marks",
+          const sheetDataRows = [
+            [sheetName],
+            [
+              "Roll No",
+              "Name",
+              ...coKeys.map((co) => `Total of ${co}`),
+              "Total Marks",
+            ],
+            ...Array.from(
+              { length: sheetData.studentNames.length - 1 },
+              (_, i) => [
+                sheetData.rollNumbers[i + 1] || "N/A",
+                sheetData.studentNames[i + 1] || "N/A",
+                ...coKeys.map((co) => sheetData.coData[co][i + 2] || "0"),
+                sheetData.totalMarks[i + 2] || "0",
+              ]
+            ),
+            [],
+            [],
+            ["CO Attainment Summary"],
+            ["", ...coKeys],
+            ["Marks", ...coKeys.map((co) => sheetData.coData[co][1] || 0)],
+            ["Threshold %", ...coKeys.map(() => threshold)],
+            [
+              "Threshold Marks",
+              ...coKeys.map((co) => {
+                const marks = sheetData.coData[co][1] || 0;
+                return marks === 0 ? 0 : (marks * (threshold / 100)).toFixed(2);
+              }),
+            ],
+            [
+              "Students ≥ Threshold",
+              ...coKeys.map((co) => {
+                const marks = sheetData.coData[co][1] || 0;
+                if (marks === 0) return 0;
+                const thresholdMarks = marks * (threshold / 100);
+                return sheetData.coData[co]
+                  .slice(2)
+                  .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
+              }),
+            ],
+            [
+              "Total Students",
+              ...coKeys.map(() => sheetData.studentNames.length - 1),
+            ],
+            [
+              "Percentage Attainment",
+              ...coKeys.map((co) => {
+                const marks = sheetData.coData[co][1] || 0;
+                if (marks === 0) return 0;
+                const thresholdMarks = marks * (threshold / 100);
+                const above = sheetData.coData[co]
+                  .slice(2)
+                  .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
+                const total = sheetData.studentNames.length - 1;
+                return total > 0 ? ((above / total) * 100).toFixed(2) : "0.00";
+              }),
+            ],
+            [
+              "Attainment Level",
+              ...coKeys.map((co) => {
+                const marks = sheetData.coData[co][1] || 0;
+                if (marks === 0) return 0;
+                const thresholdMarks = marks * (threshold / 100);
+                const above = sheetData.coData[co]
+                  .slice(2)
+                  .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
+                const total = sheetData.studentNames.length - 1;
+                const perc = total > 0 ? (above / total) * 100 : 0;
+                if (perc >= 80) return 3;
+                if (perc <= 40 && perc > 0) return 1;
+                if (perc > 40 && perc < 80) return 2;
+                return 0;
+              }),
+            ],
+            [],
+            [],
+            ["CO Attainment Levels"],
+            ["CO", "Attainment Level"],
             ...coKeys.map((co) => {
               const marks = sheetData.coData[co][1] || 0;
-              return marks === 0 ? 0 : (marks * (threshold / 100)).toFixed(2);
-            }),
-          ],
-          [
-            "Students ≥ Threshold",
-            ...coKeys.map((co) => {
-              const marks = sheetData.coData[co][1] || 0;
-              if (marks === 0) return 0;
-              const thresholdMarks = marks * (threshold / 100);
-              return sheetData.coData[co]
-                .slice(2)
-                .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
-            }),
-          ],
-          [
-            "Total Students",
-            ...coKeys.map(() => sheetData.studentNames.length - 1),
-          ],
-          [
-            "Percentage Attainment",
-            ...coKeys.map((co) => {
-              const marks = sheetData.coData[co][1] || 0;
-              if (marks === 0) return 0;
-              const thresholdMarks = marks * (threshold / 100);
-              const above = sheetData.coData[co]
-                .slice(2)
-                .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
-              const total = sheetData.studentNames.length - 1;
-              return total > 0 ? ((above / total) * 100).toFixed(2) : "0.00";
-            }),
-          ],
-          [
-            "Attainment Level",
-            ...coKeys.map((co) => {
-              const marks = sheetData.coData[co][1] || 0;
-              if (marks === 0) return 0;
+              if (marks === 0) return [co, 0];
               const thresholdMarks = marks * (threshold / 100);
               const above = sheetData.coData[co]
                 .slice(2)
                 .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
               const total = sheetData.studentNames.length - 1;
               const perc = total > 0 ? (above / total) * 100 : 0;
-              if (perc >= 80) return 3;
-              if (perc <= 40 && perc > 0) return 1;
-              if (perc > 40 && perc < 80) return 2;
-              return 0;
+              let level = 0;
+              if (perc >= 80) level = 3;
+              else if (perc <= 40 && perc > 0) level = 1;
+              else if (perc > 40 && perc < 80) level = 2;
+              return [co, level];
             }),
-          ],
-          [],
-          [],
-          ["CO Attainment Levels"],
-          ["CO", "Attainment Level"],
-          ...coKeys.map((co) => {
-            const marks = sheetData.coData[co][1] || 0;
-            if (marks === 0) return [co, 0];
-            const thresholdMarks = marks * (threshold / 100);
-            const above = sheetData.coData[co]
-              .slice(2)
-              .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
-            const total = sheetData.studentNames.length - 1;
-            const perc = total > 0 ? (above / total) * 100 : 0;
-            let level = 0;
-            if (perc >= 80) level = 3;
-            else if (perc <= 40 && perc > 0) level = 1;
-            else if (perc > 40 && perc < 80) level = 2;
-            return [co, level];
-          }),
-        ];
+          ];
 
-        addWorksheet(workbook, sheetName, sheetDataRows);
-      });}
-      catch (sheetError) {
+          addWorksheet(workbook, sheetName, sheetDataRows);
+        });
+      } catch (sheetError) {
         console.error("Error processing sheets:", sheetError);
         throw sheetError;
       }
@@ -531,7 +545,7 @@ const UploadedFilesPage = () => {
       const detailedAnalysis = getDetailedAnalysisData();
       const detailedCOAnalysisSheet = [
         ["THE LNMIIT JAIPUR"],
-        [`Department of \n${branchName}`],
+        [`Department of ${branchName}`],
         ["Attainment of CO's"],
         [],
         [
@@ -679,7 +693,6 @@ const UploadedFilesPage = () => {
         pattern: "solid",
         fgColor: { argb: colors.headerBg },
       };
-      
 
       detailedWorksheet.getRow(2).font = { bold: true, italic: true };
       detailedWorksheet.getRow(2).fill = {
@@ -687,7 +700,6 @@ const UploadedFilesPage = () => {
         pattern: "solid",
         fgColor: { argb: colors.accentBg },
       };
-      
 
       // Style weight row
       const weightRow = detailedWorksheet.getRow(9);
@@ -714,44 +726,44 @@ const UploadedFilesPage = () => {
         };
       }
 
- // Add the chart image with proper merging
-if (chartImage) {
-  try {
-    const imageId = workbook.addImage({
-      base64: chartImage.split(",")[1],
-      extension: "png",
-    });
+      // Add the chart image with proper merging
+      if (chartImage) {
+        try {
+          const imageId = workbook.addImage({
+            base64: chartImage.split(",")[1],
+            extension: "png",
+          });
 
-    const imageRow = detailedCOAnalysisSheet.length + 2;
-    const lastRow = detailedCOAnalysisSheet.length + 20;
-    
-    detailedWorksheet.addImage(imageId, {
-      tl: { col: 1, row: imageRow },
-      br: { col: 7, row: lastRow },
-      editAs: "oneCell",
-    });
+          const imageRow = detailedCOAnalysisSheet.length + 2;
+          const lastRow = detailedCOAnalysisSheet.length + 20;
 
-    // Merge cells for chart title using safeMergeCells
-    safeMergeCells(detailedWorksheet, {
-      top: imageRow - 1,
-      left: 1,
-      bottom: imageRow - 1,
-      right: 7
-    });
+          detailedWorksheet.addImage(imageId, {
+            tl: { col: 1, row: imageRow },
+            br: { col: 7, row: lastRow },
+            editAs: "oneCell",
+          });
 
-    const chartTitleCell = detailedWorksheet.getCell(`A${imageRow - 1}`);
-    chartTitleCell.value = "CO Attainment Chart:";
-    chartTitleCell.font = { bold: true };
-    chartTitleCell.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: colors.accentBg },
-    };
-    chartTitleCell.alignment = { horizontal: "center" };
-  } catch (imageError) {
-    console.error("Error adding image to Excel:", imageError);
-  }
-}
+          // Merge cells for chart title using safeMergeCells
+          safeMergeCells(detailedWorksheet, {
+            top: imageRow - 1,
+            left: 1,
+            bottom: imageRow - 1,
+            right: 7,
+          });
+
+          const chartTitleCell = detailedWorksheet.getCell(`A${imageRow - 1}`);
+          chartTitleCell.value = "CO Attainment Chart:";
+          chartTitleCell.font = { bold: true };
+          chartTitleCell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: colors.accentBg },
+          };
+          chartTitleCell.alignment = { horizontal: "center" };
+        } catch (imageError) {
+          console.error("Error adding image to Excel:", imageError);
+        }
+      }
 
       // Save the file
       const buffer = await workbook.xlsx.writeBuffer();
