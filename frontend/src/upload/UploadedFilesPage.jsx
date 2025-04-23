@@ -47,6 +47,14 @@ const CustomTable = ({ children, ...props }) => (
         overflow: "hidden",
         textOverflow: "ellipsis",
       },
+      "tr": {
+        "&:nth-of-type(even)": {
+          backgroundColor: useColorModeValue("gray.50", "gray.800"),
+        },
+        "&:hover": {
+          backgroundColor: useColorModeValue("gray.100", "gray.700"),
+        }
+      }
     }}
     {...props}
   >
@@ -77,9 +85,12 @@ const CustomTd = ({ children, ...props }) => (
     fontSize="sm"
     py={2}
     px={4}
+    bg={props.bg || "inherit"} // Use inherit to take parent row's background
     {...props}
   >
-    {children}
+    {children === undefined || children === null || children === ""
+      ? "0"
+      : children}
   </Td>
 );
 
@@ -591,8 +602,9 @@ const UploadedFilesPage = () => {
         ...detailedAnalysis.map((row) => [threshold, row.co]),
         [],
         [],
-        ["Observations"],
+        ["Observations", "",""], // Explicitly fill all columns
         [
+          "",
           `1. ${
             detailedAnalysis.filter((row) => row.overallPercentage >= threshold)
               .length > 0
@@ -604,8 +616,12 @@ const UploadedFilesPage = () => {
                   )}) with attainment ≥ ${threshold}% indicate GOOD performance.`
               : `No COs met or exceeded the ${threshold}% target`
           }`,
+          "", // These empty strings ensure we have cells to merge
+         
+          
         ],
         [
+          "",
           `2. ${
             detailedAnalysis.filter((row) => row.overallPercentage < threshold)
               .length > 0
@@ -617,19 +633,21 @@ const UploadedFilesPage = () => {
                   )}) with attainment < ${threshold}% suggest areas needing improvement.`
               : `All COs met or exceeded the ${threshold}% target`
           }`,
+          "", // These empty strings ensure we have cells to merge
+          
+          
         ],
         [],
         [],
         [],
         [],
       ];
-
       const detailedWorksheet = addWorksheet(
         workbook,
         "Detailed CO Analysis",
         detailedCOAnalysisSheet
       );
-
+      
       // Safe merge for header rows
       safeMergeCells(detailedWorksheet, {
         top: 1,
@@ -714,16 +732,35 @@ const UploadedFilesPage = () => {
         }
       });
 
-      // Style observations section
+      // Style observations section - only color cells that have content
       const observationsStartRow = detailedCOAnalysisSheet.length - 6;
       for (let i = observationsStartRow; i <= observationsStartRow + 2; i++) {
         const row = detailedWorksheet.getRow(i);
-        row.font = { bold: true };
-        row.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: colors.highlightBg },
-        };
+
+        // Count how many columns have content in this row
+        const lastColWithContent = detailedCOAnalysisSheet[i - 1].length;
+
+        // Only style cells that have content
+        for (let col = 1; col <= lastColWithContent; col++) {
+          const cell = row.getCell(col);
+          cell.font = { bold: true };
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: colors.highlightBg },
+          };
+        }
+
+        // For cells beyond content, clear any styling
+        for (let col = lastColWithContent + 1; col <= 7; col++) {
+          const cell = row.getCell(col);
+          cell.font = {};
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: colors.oddRowBg }, // Use default background
+          };
+        }
       }
 
       // Add the chart image with proper merging
