@@ -227,13 +227,25 @@ const UploadedFilesPage = () => {
   };
 
   const captureChartImage = async () => {
+    if (!showDetailedAnalysis) return null;
+
     const chartElement = document.getElementById("co-attainment-chart");
-    if (!chartElement) return null;
+    if (!chartElement) {
+      console.warn(
+        "Chart element not found - make sure detailed analysis is shown"
+      );
+      return null;
+    }
 
     try {
+      // Make sure chart is visible
+      chartElement.style.visibility = "visible";
+      chartElement.style.display = "block";
+
       const dataUrl = await toPng(chartElement, {
         backgroundColor: "#FFFFFF",
         quality: 1,
+        pixelRatio: 2,
       });
 
       return dataUrl;
@@ -244,283 +256,517 @@ const UploadedFilesPage = () => {
   };
 
   const downloadAllSheetsAsExcel = async () => {
-    const ExcelJS = await import("exceljs");
-    const workbook = new ExcelJS.Workbook();
-    const normalizedWeights = weights.map((w) => w / 100);
-    const chartImage = await captureChartImage();
+    try {
+      const ExcelJS = await import("exceljs");
+      const workbook = new ExcelJS.Workbook();
+      const normalizedWeights = weights.map((w) => w / 100);
 
-    const addWorksheet = (workbook, sheetName, data) => {
-      const worksheet = workbook.addWorksheet(sheetName);
-      data.forEach((row) => {
-        worksheet.addRow(row);
+      // Define color scheme
+      const colors = {
+        headerBg: "FF4472C4", // Blue header
+        headerText: "FFFFFFFF", // White header text
+        evenRowBg: "FFD9E1F2", // Light blue for even rows
+        oddRowBg: "FFFFFFFF", // White for odd rows
+        accentBg: "FFB4C6E7", // Medium blue for accent
+        border: "FF8EA9DB", // Border color
+        highlightBg: "FFF4B084", // Orange for highlights
+        text: "FF000000", // Black text
+        lightText: "FF7F7F7F", // Gray text
+      };
+      // Safe merge function
+      const safeMergeCells = (worksheet, range) => {
+        try {
+          // Skip if it's a single cell
+          if (range.left === range.right && range.top === range.bottom) return;
+
+          // Try to merge, but don't worry if it fails
+          worksheet.mergeCells(range);
+        } catch (error) {
+          console.warn(`Merge cells skipped:`, error.message);
+        }
+      };
+
+      // Add delay to ensure chart is fully rendered
+      const chartImage = await new Promise((resolve) => {
+        setTimeout(async () => {
+          try {
+            const chartElement = document.getElementById("co-attainment-chart");
+            if (!chartElement) {
+              console.warn("Chart element not found");
+              return resolve(null);
+            }
+
+            chartElement.style.visibility = "visible";
+            chartElement.style.display = "block";
+
+            const dataUrl = await toPng(chartElement, {
+              backgroundColor: "#FFFFFF",
+              quality: 1,
+              pixelRatio: 2,
+            });
+            resolve(dataUrl);
+          } catch (error) {
+            console.error("Error capturing chart:", error);
+            resolve(null);
+          }
+        }, 1000);
       });
 
-      // Style header row
-      if (data.length > 0) {
-        const headerRow = worksheet.getRow(1);
-        headerRow.font = { bold: true };
-        headerRow.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: "FFD3D3D3" },
-        };
-      }
+      const addWorksheet = (workbook, sheetName, data) => {
+        const worksheet = workbook.addWorksheet(sheetName);
 
-      // Set wrap text for all cells
-      worksheet.eachRow((row) => {
-        row.eachCell((cell) => {
-          cell.alignment = { wrapText: true };
+        // Add all data rows
+        data.forEach((row, rowIndex) => {
+          const excelRow = worksheet.addRow(row);
+
+          if (rowIndex === 0) {
+            excelRow.font = {
+              bold: true,
+              size: 14,
+              color: { argb: colors.headerText },
+            };
+            excelRow.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: colors.headerBg },
+            };
+            excelRow.alignment = { horizontal: "center" };
+            if (row.length > 1) {
+              safeMergeCells(worksheet, {
+                top: excelRow.number,
+                left: 1,
+                bottom: excelRow.number,
+                right: row.length
+              });
+            }
+          } else if (
+            row[0] === "CO Attainment Summary" ||
+            row[0] === "CO Attainment Levels" ||
+            row[0] === "Observations"
+          ) {
+            // Section header rows
+            excelRow.font = { bold: true, color: { argb: colors.headerText } };
+            excelRow.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: colors.headerBg },
+            };
+            if (row.length > 1) {
+              worksheet.mergeCells(
+                `A${excelRow.number}:${String.fromCharCode(
+                  65 + row.length - 1
+                )}${excelRow.number}`
+              );
+            }
+          } else if (
+            rowIndex > 0 &&
+            row.some((cell) => typeof cell === "string" && cell.includes("CO"))
+          ) {
+            // CO rows
+            excelRow.font = { bold: true };
+            excelRow.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: colors.accentBg },
+            };
+          } else if (rowIndex > 0) {
+            // Regular data rows
+            excelRow.font = { color: { argb: colors.text } };
+            excelRow.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: {
+                argb: rowIndex % 2 === 0 ? colors.evenRowBg : colors.oddRowBg,
+              },
+            };
+          }
         });
-      });
 
-      // Auto-fit columns with a minimum width
-      worksheet.columns.forEach((column) => {
-        let maxLength = 0;
-        column.eachCell({ includeEmpty: true }, (cell) => {
-          const columnLength = cell.value ? cell.value.toString().length : 0;
-          if (columnLength > maxLength) maxLength = columnLength;
+        // Set borders for all cells with data
+        worksheet.eachRow((row, rowNumber) => {
+          row.eachCell((cell) => {
+            cell.border = {
+              top: { style: "thin", color: { argb: colors.border } },
+              left: { style: "thin", color: { argb: colors.border } },
+              bottom: { style: "thin", color: { argb: colors.border } },
+              right: { style: "thin", color: { argb: colors.border } },
+            };
+          });
         });
-        column.width = Math.min(Math.max(maxLength + 2, 10), 50); // Increased max width
-      });
 
-      return worksheet;
-    };
+        // Set wrap text for all cells
+        worksheet.eachRow((row) => {
+          row.eachCell((cell) => {
+            cell.alignment = {
+              wrapText: true,
+              vertical: "middle",
+              horizontal: "center",
+            };
+          });
+        });
 
-    // Process each sheet
-    Object.keys(processedData).forEach((sheetName) => {
-      const sheetData = processedData[sheetName];
-      const coKeys = Object.keys(sheetData.coData);
+        // Auto-fit columns with a minimum width
+        worksheet.columns.forEach((column) => {
+          let maxLength = 0;
+          column.eachCell({ includeEmpty: true }, (cell) => {
+            const columnLength = cell.value ? cell.value.toString().length : 0;
+            if (columnLength > maxLength) maxLength = columnLength;
+          });
+          column.width = Math.min(Math.max(maxLength + 2, 10), 50);
+        });
 
-      const sheetDataRows = [
-        ["Sheet Data"],
-        [
-          "Roll No",
-          "Name",
-          ...coKeys.map((co) => `Total of ${co}`),
-          "Total Marks",
-        ],
-        ...Array.from({ length: sheetData.studentNames.length - 1 }, (_, i) => [
-          sheetData.rollNumbers[i + 1] || "N/A",
-          sheetData.studentNames[i + 1] || "N/A",
-          ...coKeys.map((co) => sheetData.coData[co][i + 2] || "0"),
-          sheetData.totalMarks[i + 2] || "0",
-        ]),
-        [],
-        [],
-        ["CO Attainment Summary"],
-        ["", ...coKeys],
-        ["Marks", ...coKeys.map((co) => sheetData.coData[co][1] || 0)],
-        ["Threshold %", ...coKeys.map(() => threshold)],
-        [
-          "Threshold Marks",
+        return worksheet;
+      };
+
+      // Process each sheet
+      try {
+      Object.keys(processedData).forEach((sheetName) => {
+        const sheetData = processedData[sheetName];
+        const coKeys = Object.keys(sheetData.coData);
+
+        const sheetDataRows = [
+          [sheetName],
+          [
+            "Roll No",
+            "Name",
+            ...coKeys.map((co) => `Total of ${co}`),
+            "Total Marks",
+          ],
+          ...Array.from(
+            { length: sheetData.studentNames.length - 1 },
+            (_, i) => [
+              sheetData.rollNumbers[i + 1] || "N/A",
+              sheetData.studentNames[i + 1] || "N/A",
+              ...coKeys.map((co) => sheetData.coData[co][i + 2] || "0"),
+              sheetData.totalMarks[i + 2] || "0",
+            ]
+          ),
+          [],
+          [],
+          ["CO Attainment Summary"],
+          ["", ...coKeys],
+          ["Marks", ...coKeys.map((co) => sheetData.coData[co][1] || 0)],
+          ["Threshold %", ...coKeys.map(() => threshold)],
+          [
+            "Threshold Marks",
+            ...coKeys.map((co) => {
+              const marks = sheetData.coData[co][1] || 0;
+              return marks === 0 ? 0 : (marks * (threshold / 100)).toFixed(2);
+            }),
+          ],
+          [
+            "Students ≥ Threshold",
+            ...coKeys.map((co) => {
+              const marks = sheetData.coData[co][1] || 0;
+              if (marks === 0) return 0;
+              const thresholdMarks = marks * (threshold / 100);
+              return sheetData.coData[co]
+                .slice(2)
+                .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
+            }),
+          ],
+          [
+            "Total Students",
+            ...coKeys.map(() => sheetData.studentNames.length - 1),
+          ],
+          [
+            "Percentage Attainment",
+            ...coKeys.map((co) => {
+              const marks = sheetData.coData[co][1] || 0;
+              if (marks === 0) return 0;
+              const thresholdMarks = marks * (threshold / 100);
+              const above = sheetData.coData[co]
+                .slice(2)
+                .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
+              const total = sheetData.studentNames.length - 1;
+              return total > 0 ? ((above / total) * 100).toFixed(2) : "0.00";
+            }),
+          ],
+          [
+            "Attainment Level",
+            ...coKeys.map((co) => {
+              const marks = sheetData.coData[co][1] || 0;
+              if (marks === 0) return 0;
+              const thresholdMarks = marks * (threshold / 100);
+              const above = sheetData.coData[co]
+                .slice(2)
+                .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
+              const total = sheetData.studentNames.length - 1;
+              const perc = total > 0 ? (above / total) * 100 : 0;
+              if (perc >= 80) return 3;
+              if (perc <= 40 && perc > 0) return 1;
+              if (perc > 40 && perc < 80) return 2;
+              return 0;
+            }),
+          ],
+          [],
+          [],
+          ["CO Attainment Levels"],
+          ["CO", "Attainment Level"],
           ...coKeys.map((co) => {
             const marks = sheetData.coData[co][1] || 0;
-            return marks === 0 ? 0 : (marks * (threshold / 100)).toFixed(2);
-          }),
-        ],
-        [
-          "Students ≥ Threshold",
-          ...coKeys.map((co) => {
-            const marks = sheetData.coData[co][1] || 0;
-            if (marks === 0) return 0;
-            const thresholdMarks = marks * (threshold / 100);
-            return sheetData.coData[co]
-              .slice(2)
-              .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
-          }),
-        ],
-        [
-          "Total Students",
-          ...coKeys.map(() => sheetData.studentNames.length - 1),
-        ],
-        [
-          "Percentage Attainment",
-          ...coKeys.map((co) => {
-            const marks = sheetData.coData[co][1] || 0;
-            if (marks === 0) return 0;
-            const thresholdMarks = marks * (threshold / 100);
-            const above = sheetData.coData[co]
-              .slice(2)
-              .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
-            const total = sheetData.studentNames.length - 1;
-            return total > 0 ? ((above / total) * 100).toFixed(2) : "0.00";
-          }),
-        ],
-        [
-          "Attainment Level",
-          ...coKeys.map((co) => {
-            const marks = sheetData.coData[co][1] || 0;
-            if (marks === 0) return 0;
+            if (marks === 0) return [co, 0];
             const thresholdMarks = marks * (threshold / 100);
             const above = sheetData.coData[co]
               .slice(2)
               .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
             const total = sheetData.studentNames.length - 1;
             const perc = total > 0 ? (above / total) * 100 : 0;
-            if (perc >= 80) return 3;
-            if (perc <= 40 && perc > 0) return 1;
-            if (perc > 40 && perc < 80) return 2;
-            return 0;
+            let level = 0;
+            if (perc >= 80) level = 3;
+            else if (perc <= 40 && perc > 0) level = 1;
+            else if (perc > 40 && perc < 80) level = 2;
+            return [co, level];
           }),
+        ];
+
+        addWorksheet(workbook, sheetName, sheetDataRows);
+      });}
+      catch (sheetError) {
+        console.error("Error processing sheets:", sheetError);
+        throw sheetError;
+      }
+
+      // Create Detailed CO Analysis sheet
+      const detailedAnalysis = getDetailedAnalysisData();
+      const detailedCOAnalysisSheet = [
+        ["THE LNMIIT JAIPUR"],
+        [`Department of \n${branchName}`],
+        ["Attainment of CO's"],
+        [],
+        [
+          `Program: \n${branchName}`,
+          `${courseName}`,
+          `Class: ${className}`,
+          `Semester: ${semester}`,
+          `Academic Year: ${academicYear}`,
         ],
         [],
         [],
-        ["CO Attainment Levels"],
-        ["CO", "Attainment Level"],
-        ...coKeys.map((co) => {
-          const marks = sheetData.coData[co][1] || 0;
-          if (marks === 0) return [co, 0];
-          const thresholdMarks = marks * (threshold / 100);
-          const above = sheetData.coData[co]
-            .slice(2)
-            .filter((mark) => parseFloat(mark) >= thresholdMarks).length;
-          const total = sheetData.studentNames.length - 1;
-          const perc = total > 0 ? (above / total) * 100 : 0;
-          let level = 0;
-          if (perc >= 80) level = 3;
-          else if (perc <= 40 && perc > 0) level = 1;
-          else if (perc > 40 && perc < 80) level = 2;
-          return [co, level];
-        }),
+        [
+          "Sr. No.",
+          "CO Statement",
+          ...componentNames,
+          "Attainment \n Level",
+          "Indirect \nAssessment",
+          "Overall Attainment \non the \nScale of 3",
+          "Overall \nPercentage \nAttainment",
+        ],
+        [
+          "",
+          "Weightage",
+          ...weights.map((w) => `${(w / 100).toFixed(3)}`),
+          "",
+          "(Course End Survey)",
+          "",
+          "",
+        ],
+        ...detailedAnalysis.map((row) => [
+          row.co,
+          row.statement,
+          ...componentNames.map((comp) => row.components[comp]?.value || 0),
+          row.attainmentLevel.toFixed(2),
+          row.indirectAssessment.toFixed(2),
+          row.overallAttainment.toFixed(2),
+          `${row.overallPercentage.toFixed(2)}%`,
+        ]),
+        [],
+        [],
+        ["Attainment Targets"],
+        ["Target (%)", "CO"],
+        ...detailedAnalysis.map((row) => [threshold, row.co]),
+        [],
+        [],
+        ["Observations"],
+        [
+          `1. ${
+            detailedAnalysis.filter((row) => row.overallPercentage >= threshold)
+              .length > 0
+              ? `COs (${detailedAnalysis
+                  .filter((row) => row.overallPercentage >= threshold)
+                  .map((row) => row.co)
+                  .join(
+                    ", "
+                  )}) with attainment ≥ ${threshold}% indicate GOOD performance.`
+              : `No COs met or exceeded the ${threshold}% target`
+          }`,
+        ],
+        [
+          `2. ${
+            detailedAnalysis.filter((row) => row.overallPercentage < threshold)
+              .length > 0
+              ? `COs (${detailedAnalysis
+                  .filter((row) => row.overallPercentage < threshold)
+                  .map((row) => row.co)
+                  .join(
+                    ", "
+                  )}) with attainment < ${threshold}% suggest areas needing improvement.`
+              : `All COs met or exceeded the ${threshold}% target`
+          }`,
+        ],
+        [],
+        [],
+        [],
+        [],
       ];
 
-      addWorksheet(workbook, sheetName, sheetDataRows);
-    });
+      const detailedWorksheet = addWorksheet(
+        workbook,
+        "Detailed CO Analysis",
+        detailedCOAnalysisSheet
+      );
 
-    // Create Detailed CO Analysis sheet
-    const detailedAnalysis = getDetailedAnalysisData();
-    const detailedCOAnalysisSheet = [
-      ["THE LNMIIT JAIPUR"],
-      [`Department of ${branchName}`],
-      ["Attainment of CO's"],
-      [],
-      [
-        `Program: ${branchName}`,
-        `${courseName}`,
-        `Class: ${className}`,
-        `Semester: ${semester}`,
-        `Academic Year: ${academicYear}`,
-      ],
-      [],
-      [],
-      [
-        "Sr. No.",
-        "CO Statement",
-        ...componentNames,
-        "Attainment Level",
-        "Indirect Assessment",
-        "Overall Attainment on Scale of 3",
-        "Overall Percentage Attainment",
-      ],
-      [
-        "",
-        "Weightage",
-        ...weights.map((w) => `${(w / 100).toFixed(3)}`),
-        "",
-        "",
-        "",
-        "",
-      ],
-      ...detailedAnalysis.map((row) => [
-        row.co,
-        row.statement,
-        ...componentNames.map((comp) => row.components[comp]?.value || 0),
-        row.attainmentLevel.toFixed(2),
-        row.indirectAssessment.toFixed(2),
-        row.overallAttainment.toFixed(2),
-        `${row.overallPercentage.toFixed(2)}%`,
-      ]),
-      [],
-      [],
-      ["Attainment Targets"],
-      ["Target (%)", "CO"],
-      ...detailedAnalysis.map((row) => [threshold, row.co]),
-      [],
-      [],
-      ["Observations"],
-      [
-        `1. ${
-          detailedAnalysis.filter((row) => row.overallPercentage >= threshold)
-            .length > 0
-            ? `COs (${detailedAnalysis
-                .filter((row) => row.overallPercentage >= threshold)
-                .map((row) => row.co)
-                .join(
-                  ", "
-                )}) with attainment ≥ ${threshold}% indicate GOOD performance.`
-            : `No COs met or exceeded the ${threshold}% target`
-        }`,
-      ],
-      [
-        `2. ${
-          detailedAnalysis.filter((row) => row.overallPercentage < threshold)
-            .length > 0
-            ? `COs (${detailedAnalysis
-                .filter((row) => row.overallPercentage < threshold)
-                .map((row) => row.co)
-                .join(
-                  ", "
-                )}) with attainment < ${threshold}% suggest areas needing improvement.`
-            : `All COs met or exceeded the ${threshold}% target`
-        }`,
-      ],
-      [],
-      [],
-      ["CO Attainment Chart:"],
-      [],
-    ];
+      // Safe merge for header rows
+      safeMergeCells(detailedWorksheet, {
+        top: 1,
+        left: 1,
+        bottom: 1,
+        right: 7,
+      });
 
-    const detailedWorksheet = addWorksheet(
-      workbook,
-      "Detailed CO Analysis",
-      detailedCOAnalysisSheet
-    );
+      safeMergeCells(detailedWorksheet, {
+        top: 2,
+        left: 1,
+        bottom: 2,
+        right: 7,
+      });
 
-    // Manually set column widths for specific columns that need more space
-    if (detailedWorksheet.columns && detailedWorksheet.columns.length > 1) {
-      // Make the CO Statement column wider (column B)
-      detailedWorksheet.columns[1].width = 50; // Set a fixed width for statement column
+      // Set width for column A (Sr. No. column)
+      if (detailedWorksheet.columns && detailedWorksheet.columns.length > 0) {
+        detailedWorksheet.columns[0].width = 35; // Set width for column A
+      }
 
-      // Make component columns narrower (columns C, D, etc.)
-      componentNames.forEach((_, i) => {
-        if (detailedWorksheet.columns[2 + i]) {
-          detailedWorksheet.columns[2 + i].width = 15;
+      // Manually set column widths for specific columns that need more space
+      if (detailedWorksheet.columns && detailedWorksheet.columns.length > 1) {
+        // Make the CO Statement column wider (column B)
+        detailedWorksheet.columns[1].width = 40; // CO Statement column
+
+        // Make component columns narrower (columns C, D, etc.)
+        componentNames.forEach((_, i) => {
+          if (detailedWorksheet.columns[2 + i]) {
+            detailedWorksheet.columns[2 + i].width = 10; // Component columns
+          }
+        });
+
+        // Set specific widths for the attainment columns
+        const attainmentLevelCol = 2 + componentNames.length;
+        const indirectAssessmentCol = attainmentLevelCol + 1;
+        const overallAttainmentCol = indirectAssessmentCol + 1;
+        const percentageCol = overallAttainmentCol + 1;
+
+        if (detailedWorksheet.columns[attainmentLevelCol]) {
+          detailedWorksheet.columns[attainmentLevelCol].width = 12; // Attainment Level
+        }
+        if (detailedWorksheet.columns[indirectAssessmentCol]) {
+          detailedWorksheet.columns[indirectAssessmentCol].width = 12; // Indirect Assessment
+        }
+        if (detailedWorksheet.columns[overallAttainmentCol]) {
+          detailedWorksheet.columns[overallAttainmentCol].width = 12; // Overall Attainment
+        }
+        if (detailedWorksheet.columns[percentageCol]) {
+          detailedWorksheet.columns[percentageCol].width = 12; // Percentage
+        }
+      }
+
+      // Style specific cells in detailed analysis
+      detailedWorksheet.getRow(1).font = {
+        bold: true,
+        size: 16,
+        color: { argb: colors.headerText },
+      };
+      detailedWorksheet.getRow(1).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: colors.headerBg },
+      };
+      
+
+      detailedWorksheet.getRow(2).font = { bold: true, italic: true };
+      detailedWorksheet.getRow(2).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: colors.accentBg },
+      };
+      
+
+      // Style weight row
+      const weightRow = detailedWorksheet.getRow(9);
+      weightRow.font = { italic: true, color: { argb: colors.lightText } };
+      weightRow.eachCell((cell) => {
+        if (
+          cell.value &&
+          typeof cell.value === "string" &&
+          cell.value.includes("Weightage")
+        ) {
+          cell.font = { italic: true, bold: true };
         }
       });
-    }
 
-    if (chartImage) {
-      try {
-        const imageId = workbook.addImage({
-          base64: chartImage.split(",")[1],
-          extension: "png",
-        });
-
-        detailedWorksheet.addImage(imageId, {
-          tl: { col: 0, row: detailedCOAnalysisSheet.length + 3 },
-          ext: { width: 600, height: 350 },
-          editAs: "oneCell",
-        });
-
-        detailedWorksheet.mergeCells(
-          `B${detailedCOAnalysisSheet.length + 3}:G${
-            detailedCOAnalysisSheet.length + 18
-          }`
-        );
-      } catch (error) {
-        console.error("Error adding image to Excel:", error);
+      // Style observations section
+      const observationsStartRow = detailedCOAnalysisSheet.length - 6;
+      for (let i = observationsStartRow; i <= observationsStartRow + 2; i++) {
+        const row = detailedWorksheet.getRow(i);
+        row.font = { bold: true };
+        row.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: colors.highlightBg },
+        };
       }
-    }
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    const data = new Blob([buffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+ // Add the chart image with proper merging
+if (chartImage) {
+  try {
+    const imageId = workbook.addImage({
+      base64: chartImage.split(",")[1],
+      extension: "png",
     });
-    const timestamp = new Date()
-      .toISOString()
-      .slice(0, 19)
-      .replace(/[:T]/g, "-");
-    saveAs(data, `Combined_CO_Analysis_${threshold}perc_${timestamp}.xlsx`);
+
+    const imageRow = detailedCOAnalysisSheet.length + 2;
+    const lastRow = detailedCOAnalysisSheet.length + 20;
+    
+    detailedWorksheet.addImage(imageId, {
+      tl: { col: 1, row: imageRow },
+      br: { col: 7, row: lastRow },
+      editAs: "oneCell",
+    });
+
+    // Merge cells for chart title using safeMergeCells
+    safeMergeCells(detailedWorksheet, {
+      top: imageRow - 1,
+      left: 1,
+      bottom: imageRow - 1,
+      right: 7
+    });
+
+    const chartTitleCell = detailedWorksheet.getCell(`A${imageRow - 1}`);
+    chartTitleCell.value = "CO Attainment Chart:";
+    chartTitleCell.font = { bold: true };
+    chartTitleCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: colors.accentBg },
+    };
+    chartTitleCell.alignment = { horizontal: "center" };
+  } catch (imageError) {
+    console.error("Error adding image to Excel:", imageError);
+  }
+}
+
+      // Save the file
+      const buffer = await workbook.xlsx.writeBuffer();
+      const data = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const timestamp = new Date()
+        .toISOString()
+        .slice(0, 19)
+        .replace(/[:T]/g, "-");
+      saveAs(data, `Combined_CO_Analysis_${threshold}perc_${timestamp}.xlsx`);
+    } catch (error) {
+      console.error("Error generating Excel file:", error);
+      alert("Error generating Excel file. Please check console for details.");
+    }
   };
 
   return (

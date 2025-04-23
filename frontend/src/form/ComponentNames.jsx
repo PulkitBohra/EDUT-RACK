@@ -72,18 +72,18 @@ const ComponentNames = () => {
 
     let total = 0;
     weights.forEach((w, idx) => {
-      if (!/^\d+$/.test(w)) {
-        weightErrors[idx] = "Only numbers allowed";
-      } else if (parseInt(w, 10) > 100) {
-        weightErrors[idx] = "Must be less than 100";
+      if (!/^\d*\.?\d{0,2}$/.test(w)) {
+        weightErrors[idx] = "Only numbers with up to 2 decimals allowed";
+      } else if (parseFloat(w) > 100) {
+        weightErrors[idx] = "Must be less than or equal to 100";
       } else {
         weightErrors[idx] = "";
-        total += parseInt(w, 10);
+        total += parseFloat(w || 0);
       }
     });
 
-    const totalWeightError =
-      total !== 100 ? "Total weightage must equal 100" : "";
+    const totalWeightError = 
+      Math.abs(total - 100) > 0.01 ? "Total weightage must equal 100" : "";
 
     setErrors({ names: nameErrors, weights: weightErrors, totalWeightError });
 
@@ -114,7 +114,7 @@ const ComponentNames = () => {
             COcount: courseOutcomeCount,
           },
           componentNames,
-          weights: weights.map((w) => parseInt(w, 10)),
+          weights: weights.map((w) => parseFloat(w || 0)),
           coStatements,
           branchName: programName,
           courseName: courseName,
@@ -292,11 +292,15 @@ const ComponentNames = () => {
                 placeholder={`Component ${index + 1} Weightage`}
                 value={weights[index]}
                 onChange={(e) => {
-                  const updatedWeights = [...weights];
-                  updatedWeights[index] = e.target.value;
-                  setWeights(updatedWeights);
+                  const value = e.target.value;
+                  if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
+                    const updatedWeights = [...weights];
+                    updatedWeights[index] = value;
+                    setWeights(updatedWeights);
+                  }
                 }}
                 type="number"
+                step="0.01"
               />
               {errors.weights[index] && (
                 <FormErrorMessage>{errors.weights[index]}</FormErrorMessage>
@@ -318,12 +322,5 @@ const ComponentNames = () => {
     </>
   );
 };
-// export const Branch_name = Branch_name;
-// export const Course_name = Course_name ;
-// export const classname =classname;
-// export const semester = semester;
-// export const academicYear =academicYear;
-// export const indirectAttainment = indirectAttainment; // Example value
-// export const coStatements = coStatements; // Example valu
 
 export default ComponentNames;
