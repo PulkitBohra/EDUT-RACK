@@ -24,7 +24,7 @@ const Navbar = () => {
       {/* Center: Title */}
       <Box textAlign="center">
         <Text fontSize="lg" fontWeight="bold">
-          LNM Institute of Information Technology
+          The LNM Institute of Information Technology
         </Text>
         <Text fontSize="sm" opacity={0.9}>
           Deemed to be University
@@ -39,12 +39,12 @@ const Navbar = () => {
         >
           Home
         </Text>
-        <Text
+        {/* <Text
           className="cursor-pointer hover:bg-white hover:text-[#8c1616] px-4 py-2 rounded-md transition duration-300"
           onClick={() => navigate("/about")}
         >
           About
-        </Text>
+        </Text> */}
 
         {/* Buttons */}
         <Flex gap={4}>

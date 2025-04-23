@@ -24,11 +24,11 @@ const MainHeader = () => {
                         Home
                     </Link>
                 </Flex>
-                <Flex>
+                {/* <Flex>
                     <Link to="/" style={{ color: "white", fontSize: "lg", textDecoration: "none" }}>
                         About
                     </Link>
-                </Flex>
+                </Flex> */}
                 <Flex>
                     <Link to="/" style={{ color: "white", fontSize: "lg", textDecoration: "none" }}>
                         Sign Out
