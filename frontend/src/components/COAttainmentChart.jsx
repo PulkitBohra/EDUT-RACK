@@ -10,7 +10,6 @@ import {
   Legend,
 } from 'chart.js';
 
-// Register ChartJS components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -21,7 +20,7 @@ ChartJS.register(
 );
 
 const COAttainmentChart = ({ data, threshold }) => {
-  // Prepare chart data
+  
   const chartData = {
     labels: data.map(row => row.co),
     datasets: [
@@ -42,7 +41,7 @@ const COAttainmentChart = ({ data, threshold }) => {
     ],
   };
 
-  // Chart options
+
   const options = {
     responsive: true,
     maintainAspectRatio: false,

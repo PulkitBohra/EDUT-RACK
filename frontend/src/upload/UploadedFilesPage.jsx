@@ -85,7 +85,7 @@ const CustomTd = ({ children, ...props }) => (
     fontSize="sm"
     py={2}
     px={4}
-    bg={props.bg || "inherit"} // Use inherit to take parent row's background
+    bg={props.bg || "inherit"} 
     {...props}
   >
     {children === undefined || children === null || children === ""
@@ -249,7 +249,7 @@ const UploadedFilesPage = () => {
     }
 
     try {
-      // Make sure chart is visible
+      
       chartElement.style.visibility = "visible";
       chartElement.style.display = "block";
 
@@ -287,17 +287,17 @@ const UploadedFilesPage = () => {
       // Safe merge function
       const safeMergeCells = (worksheet, range) => {
         try {
-          // Skip if it's a single cell
+          
           if (range.left === range.right && range.top === range.bottom) return;
 
-          // Try to merge, but don't worry if it fails
+          
           worksheet.mergeCells(range);
         } catch (error) {
           console.warn(`Merge cells skipped:`, error.message);
         }
       };
 
-      // Add delay to ensure chart is fully rendered
+      
       const chartImage = await new Promise((resolve) => {
         setTimeout(async () => {
           try {
@@ -326,16 +326,16 @@ const UploadedFilesPage = () => {
       const addWorksheet = (workbook, sheetName, data) => {
         const worksheet = workbook.addWorksheet(sheetName);
 
-        // Add all data rows
+        
         data.forEach((row, rowIndex) => {
           const excelRow = worksheet.addRow(row);
 
-          // Style only the cells with content, not the entire row
+          
           excelRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
             if (row[colNumber - 1]) {
-              // Only style cells with content
+              
               if (rowIndex === 0) {
-                // Header row styling (first row)
+                
                 cell.font = {
                   bold: true,
                   size: 14,
@@ -352,9 +352,9 @@ const UploadedFilesPage = () => {
                 row[0] === "CO Attainment Levels" ||
                 row[0] === "Observations"
               ) {
-                // Section header rows
+                
                 if (colNumber === 1) {
-                  // Only style the first cell
+                  
                   cell.font = {
                     bold: true,
                     color: { argb: colors.headerText },
@@ -371,7 +371,7 @@ const UploadedFilesPage = () => {
                   (cell) => typeof cell === "string" && cell.includes("CO")
                 )
               ) {
-                // CO rows - apply styling only to cells with content
+                
                 cell.font = { bold: true };
                 cell.fill = {
                   type: "pattern",
@@ -379,7 +379,7 @@ const UploadedFilesPage = () => {
                   fgColor: { argb: colors.accentBg },
                 };
               } else if (rowIndex > 0) {
-                // Regular data rows
+                
                 cell.font = { color: { argb: colors.text } };
                 cell.fill = {
                   type: "pattern",
@@ -391,7 +391,7 @@ const UploadedFilesPage = () => {
                 };
               }
 
-              // Apply borders to all cells with content
+              
               cell.border = {
                 top: { style: "thin", color: { argb: colors.border } },
                 left: { style: "thin", color: { argb: colors.border } },
@@ -407,7 +407,7 @@ const UploadedFilesPage = () => {
             }
           });
 
-          // Handle merging for header rows
+          
           if (rowIndex === 0 && row.length > 1) {
             safeMergeCells(worksheet, {
               top: excelRow.number,
@@ -430,7 +430,7 @@ const UploadedFilesPage = () => {
           }
         });
 
-        // Auto-fit columns with a minimum width
+        
         worksheet.columns.forEach((column) => {
           let maxLength = 0;
           column.eachCell({ includeEmpty: true }, (cell) => {
@@ -443,7 +443,7 @@ const UploadedFilesPage = () => {
         return worksheet;
       };
 
-      // Process each sheet
+      
       try {
         Object.keys(processedData).forEach((sheetName) => {
           const sheetData = processedData[sheetName];
@@ -552,7 +552,7 @@ const UploadedFilesPage = () => {
         throw sheetError;
       }
 
-      // Create Detailed CO Analysis sheet
+      
       const detailedAnalysis = getDetailedAnalysisData();
       const detailedCOAnalysisSheet = [
         ["THE LNMIIT JAIPUR"],
@@ -616,7 +616,7 @@ const UploadedFilesPage = () => {
                   )}) with attainment ≥ ${threshold}% indicate GOOD performance.`
               : `No COs met or exceeded the ${threshold}% target`
           }`,
-          "", // These empty strings ensure we have cells to merge
+          "", 
          
           
         ],
@@ -633,7 +633,7 @@ const UploadedFilesPage = () => {
                   )}) with attainment < ${threshold}% suggest areas needing improvement.`
               : `All COs met or exceeded the ${threshold}% target`
           }`,
-          "", // These empty strings ensure we have cells to merge
+          "", 
           
           
         ],
@@ -648,7 +648,7 @@ const UploadedFilesPage = () => {
         detailedCOAnalysisSheet
       );
       
-      // Safe merge for header rows
+     
       safeMergeCells(detailedWorksheet, {
         top: 1,
         left: 1,
@@ -663,24 +663,24 @@ const UploadedFilesPage = () => {
         right: 7,
       });
 
-      // Set width for column A (Sr. No. column)
+      
       if (detailedWorksheet.columns && detailedWorksheet.columns.length > 0) {
-        detailedWorksheet.columns[0].width = 35; // Set width for column A
+        detailedWorksheet.columns[0].width = 35; 
       }
 
-      // Manually set column widths for specific columns that need more space
+      
       if (detailedWorksheet.columns && detailedWorksheet.columns.length > 1) {
-        // Make the CO Statement column wider (column B)
-        detailedWorksheet.columns[1].width = 40; // CO Statement column
+        
+        detailedWorksheet.columns[1].width = 40;
 
-        // Make component columns narrower (columns C, D, etc.)
+        
         componentNames.forEach((_, i) => {
           if (detailedWorksheet.columns[2 + i]) {
-            detailedWorksheet.columns[2 + i].width = 10; // Component columns
+            detailedWorksheet.columns[2 + i].width = 10;
           }
         });
 
-        // Set specific widths for the attainment columns
+        
         const attainmentLevelCol = 2 + componentNames.length;
         const indirectAssessmentCol = attainmentLevelCol + 1;
         const overallAttainmentCol = indirectAssessmentCol + 1;
@@ -700,7 +700,7 @@ const UploadedFilesPage = () => {
         }
       }
 
-      // Style specific cells in detailed analysis
+      
       detailedWorksheet.getRow(1).font = {
         bold: true,
         size: 16,
@@ -719,7 +719,7 @@ const UploadedFilesPage = () => {
         fgColor: { argb: colors.accentBg },
       };
 
-      // Style weight row
+      
       const weightRow = detailedWorksheet.getRow(9);
       weightRow.font = { italic: true, color: { argb: colors.lightText } };
       weightRow.eachCell((cell) => {
@@ -732,15 +732,15 @@ const UploadedFilesPage = () => {
         }
       });
 
-      // Style observations section - only color cells that have content
+      
       const observationsStartRow = detailedCOAnalysisSheet.length - 6;
       for (let i = observationsStartRow; i <= observationsStartRow + 2; i++) {
         const row = detailedWorksheet.getRow(i);
 
-        // Count how many columns have content in this row
+        
         const lastColWithContent = detailedCOAnalysisSheet[i - 1].length;
 
-        // Only style cells that have content
+        
         for (let col = 1; col <= lastColWithContent; col++) {
           const cell = row.getCell(col);
           cell.font = { bold: true };
@@ -751,19 +751,19 @@ const UploadedFilesPage = () => {
           };
         }
 
-        // For cells beyond content, clear any styling
+        
         for (let col = lastColWithContent + 1; col <= 7; col++) {
           const cell = row.getCell(col);
           cell.font = {};
           cell.fill = {
             type: "pattern",
             pattern: "solid",
-            fgColor: { argb: colors.oddRowBg }, // Use default background
+            fgColor: { argb: colors.oddRowBg }, 
           };
         }
       }
 
-      // Add the chart image with proper merging
+      
       if (chartImage) {
         try {
           const imageId = workbook.addImage({
@@ -780,7 +780,7 @@ const UploadedFilesPage = () => {
             editAs: "oneCell",
           });
 
-          // Merge cells for chart title using safeMergeCells
+          
           safeMergeCells(detailedWorksheet, {
             top: imageRow - 1,
             left: 1,
@@ -802,7 +802,7 @@ const UploadedFilesPage = () => {
         }
       }
 
-      // Save the file
+      
       const buffer = await workbook.xlsx.writeBuffer();
       const data = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

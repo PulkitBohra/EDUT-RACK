@@ -124,7 +124,6 @@ const UserProfile = () => {
     try {
       const token = localStorage.getItem("token");
 
-      // Prepare current courses and update accordingly
       let updatedCourseList = [...(user.courses || [])];
 
       if (addCourses) {

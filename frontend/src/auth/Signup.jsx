@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button"; // ShadCN UI Button
+import { Button } from "@/components/ui/button"; 
 import { Card, CardContent } from "@/components/ui/card";
 import { FaGoogle, FaGithub } from "react-icons/fa";
-import { Flex, Box, Text, Input, Divider , Select} from "@chakra-ui/react"; // Chakra UI
+import { Flex, Box, Text, Input, Divider , Select} from "@chakra-ui/react"; 
 import axios from "axios";
 
 const Signup = () => {

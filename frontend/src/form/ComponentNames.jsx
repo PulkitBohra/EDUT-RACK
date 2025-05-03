@@ -169,7 +169,7 @@ const ComponentNames = () => {
           borderRadius="lg"
         >
           <Text fontSize="2xl" fontWeight="bold" textAlign="center" mb={6}>
-            Enter Component Names and Their Weightage (out of 100)
+             Details about the Course 
           </Text>
 
           {/* Pre-filled values */}
@@ -185,9 +185,9 @@ const ComponentNames = () => {
 
           {/* Editable inputs */}
           <FormControl mb={4} isRequired>
-            <FormLabel>Class</FormLabel>
+            <FormLabel>Year</FormLabel>
             <Select
-              placeholder="Select Class"
+              placeholder="Select Year"
               value={className}
               onChange={(e) => setClassName(e.target.value)}
             >
@@ -240,7 +240,7 @@ const ComponentNames = () => {
           </FormControl>
 
           <FormControl mb={4} isRequired>
-            <FormLabel>Indirect Attainment (Course-End Survey)</FormLabel>
+            <FormLabel>Indirect Assessment (Course-End Survey)</FormLabel>
             <Input
               type="number"
               min="0"
@@ -273,9 +273,9 @@ const ComponentNames = () => {
               isRequired
               isInvalid={!!errors.names[index] || !!errors.weights[index]}
             >
-              <FormLabel>Component {index + 1} Name</FormLabel>
+              <FormLabel>Evaluation Component {index + 1}</FormLabel>
               <Input
-                placeholder={`Component ${index + 1} Name`}
+                placeholder={`Evaluation Component ${index + 1} Name`}
                 value={name}
                 onChange={(e) => {
                   const updatedNames = [...componentNames];
@@ -289,7 +289,7 @@ const ComponentNames = () => {
               )}
 
               <Input
-                placeholder={`Component ${index + 1} Weightage`}
+                placeholder={`Evaluation Component ${index + 1} Weightage (out of 100)`}
                 value={weights[index]}
                 onChange={(e) => {
                   const value = e.target.value;

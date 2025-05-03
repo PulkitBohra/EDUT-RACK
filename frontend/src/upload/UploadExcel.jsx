@@ -26,7 +26,7 @@ const FileUploadPage = () => {
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileContents, setFileContents] = useState({});
-  const [sheetNames, setSheetNames] = useState([]); // Changed from sheetName to sheetNames
+  const [sheetNames, setSheetNames] = useState([]);
   const { formData } = location.state || {};
   const numCo = parseInt(formData?.Course_outcome, 10) || 0;
 
@@ -40,7 +40,7 @@ const FileUploadPage = () => {
     reader.onload = (e) => {
       const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: "array" });
-      setSheetNames(workbook.SheetNames); // Set all sheet names
+      setSheetNames(workbook.SheetNames); 
 
       let extractedData = {};
 
@@ -129,7 +129,6 @@ const FileUploadPage = () => {
       navigate("/uploaded-files", {
         state: {
           fileContents,
-          // Pass along all the data from the previous pages
           ...location.state,
         },
       });

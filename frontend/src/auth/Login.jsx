@@ -1,18 +1,18 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button"; // ShadCN UI Button
+import { Button } from "@/components/ui/button"; 
 import { Card, CardContent } from "@/components/ui/card";
 import { FaGoogle, FaGithub } from "react-icons/fa";
-import { Flex, Box, Text, Input, Divider, Select } from "@chakra-ui/react"; // Chakra UI
+import { Flex, Box, Text, Input, Divider, Select } from "@chakra-ui/react"; 
 import axios from "axios";
-import { useAuth } from "../context/AuthContext.jsx";  // Import useAuth to call login method
+import { useAuth } from "../context/AuthContext.jsx"; 
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();  // Get the login method from AuthContext
+  const { login } = useAuth(); 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState(""); // Set to an empty string
+  const [role, setRole] = useState(""); 
 
   const handleLogin = async () => {
     if (!email || !password || !role) {
@@ -30,7 +30,7 @@ const Login = () => {
       localStorage.setItem("token", token);
       localStorage.setItem("role", user.role);
 
-      login(user);  // Use the login function to update context and localStorage
+      login(user); 
       
 
       if (user.role === "admin") {
@@ -112,7 +112,7 @@ const Login = () => {
             size="lg"
             className="w-full mb-4"
             focusBorderColor="indigo.500"
-            placeholder="Select Role" // Placeholder text
+            placeholder="Select Role" 
           >
             <option value="user">User</option>
             <option value="admin">Admin</option>
@@ -121,15 +121,15 @@ const Login = () => {
           {/* Login Button */}
           <Button
             className="w-full text-white font-bold transition duration-300"
-            bg="#4F46E5" // Default background color
+            bg="#4F46E5"
             _hover={{
-              bg: "#4338CA", // Darker blue on hover
-              transform: "scale(1.05)", // Slight zoom-in effect
+              bg: "#4338CA", 
+              transform: "scale(1.05)", 
               boxShadow: "lg",
             }}
             _active={{
-              bg: "#3730A3", // Even darker blue on click
-              transform: "scale(0.98)", // Slight press-in effect
+              bg: "#3730A3",
+              transform: "scale(0.98)",
             }}
             borderRadius="md"
             py={2}

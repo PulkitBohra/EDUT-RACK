@@ -1,8 +1,8 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
-import HomePage from "../pages/HomePage"; // Import the HomePage component
-import Login from "../auth/Login"; // Import Login component
-import Signup from "../auth/Signup"; // Import Signup component
+import HomePage from "../pages/HomePage"; 
+import Login from "../auth/Login"; 
+import Signup from "../auth/Signup";
 import UploadExcel from "../upload/UploadExcel";
 import InputForm from "@/form/InputForm";
 import ComponentNames from "@/form/ComponentNames";

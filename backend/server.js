@@ -8,13 +8,13 @@ const bcrypt = require("bcryptjs");
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Routes
+
 const authRoutes = require("./routes/authRoutes");
 
-// Import User model correctly
+
 const User = require("./models/User"); // ✅ FIXED
 
-// Middleware
+
 app.use(express.json());
 const allowedOrigins = [
   "http://localhost:5173",
@@ -35,16 +35,16 @@ app.use(
   })
 );
 
-// MongoDB connection
+
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("Connected to MongoDB"))
   .catch((err) => console.log("Error connecting to MongoDB:", err));
 
-// Auth routes
+
 app.use("/api/auth", authRoutes);
 
-// JWT verification middleware
+
 const verifyToken = (req, res, next) => {
   const token = req.headers["authorization"]?.split(" ")[1];
   if (!token) {
@@ -54,14 +54,13 @@ const verifyToken = (req, res, next) => {
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) return res.status(403).json({ message: "Invalid token" });
 
-    // FIX HERE: Make sure `req.user.id` is available
     req.user = { id: decoded.userId, role: decoded.role };
     console.log("Token verified, user:", req.user);
     next();
   });
 };
 
-// API route to fetch the current user's profile (based on JWT)
+
 app.get("/api/users/profile", verifyToken, async (req, res) => {
   try {
     const user = await User.findById(
@@ -71,7 +70,7 @@ app.get("/api/users/profile", verifyToken, async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json(user);
   } catch (err) {
-    console.error("Error fetching profile:", err); // Add this to log errors
+    console.error("Error fetching profile:", err); 
     res.status(500).json({ message: "Error fetching profile" });
   }
 });
@@ -90,7 +89,7 @@ app.put("/api/users/profile", verifyToken, async (req, res) => {
     }
 
     const updatedUser = await User.findByIdAndUpdate(
-      req.user.id, // Use correct field from your token
+      req.user.id, 
       updates,
       { new: true }
     );
@@ -102,10 +101,10 @@ app.put("/api/users/profile", verifyToken, async (req, res) => {
   }
 });
 
-// API route to fetch all users
+
 app.get("/api/users", async (req, res) => {
   try {
-    const users = await User.find({}, "fullname email role courses"); // Make sure only necessary fields are returned
+    const users = await User.find({}, "fullname email role courses");
     res.json(users);
   } catch (err) {
     console.error("Error fetching users:", err);
@@ -113,12 +112,12 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
-// API route to create a new user
+
 app.post("/api/users", async (req, res) => {
   try {
     const { fullname, email, role, courses, password } = req.body;
 
-    // If no password is provided, set a default password
+   
     const userPassword = password || "defaultpassword123";
 
     const existingUser = await User.findOne({ email });
@@ -139,14 +138,14 @@ app.post("/api/users", async (req, res) => {
 
     res.status(201).json(newUser);
   } catch (err) {
-    console.error("Error creating user:", err); // More detailed logging
+    console.error("Error creating user:", err); 
     res
       .status(500)
       .json({ message: "Error creating user", error: err.message });
   }
 });
 
-// API route to update user details
+
 app.put("/api/users/:id", async (req, res) => {
   try {
     const updates = { ...req.body };
@@ -169,7 +168,7 @@ app.put("/api/users/:id", async (req, res) => {
 });
 
 
-// API route to delete a user
+
 app.delete("/api/users/:id", async (req, res) => {
   try {
     const deletedUser = await User.findByIdAndDelete(req.params.id);
@@ -183,7 +182,7 @@ app.delete("/api/users/:id", async (req, res) => {
   }
 });
 
-// Start the server
+
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });

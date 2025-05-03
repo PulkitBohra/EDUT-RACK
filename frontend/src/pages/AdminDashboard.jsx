@@ -10,10 +10,9 @@ import {
   HStack,
   useToast,
 } from "@chakra-ui/react";
-import { useNavigate } from "react-router-dom"; // Import useHistory for navigation
+import { useNavigate } from "react-router-dom"; 
 import MainHeader from "../shared/MainHeader";
 
-// ... imports stay the same
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
@@ -32,7 +31,7 @@ const AdminDashboard = () => {
   const fetchUsers = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/users");
-      console.log(res.data); // Log the response to verify the structure
+      console.log(res.data); 
       setUsers(res.data);
     } catch (err) {
       toast({
@@ -49,7 +48,6 @@ const AdminDashboard = () => {
 
   const handleAddUser = async () => {
     try {
-      // Ensure that password is included in the request body
       await axios.post("http://localhost:5000/api/users", newUser);
       toast({ title: "User added!", status: "success" });
       fetchUsers();

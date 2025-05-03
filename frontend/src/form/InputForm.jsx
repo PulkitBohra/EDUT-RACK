@@ -201,7 +201,7 @@ const InputForm = () => {
             </Select>
 
             <FormLabel fontWeight="semibold">
-              Select Number of Components
+              Select Number of Evaluation Components
             </FormLabel>
             <Select
               id="Components"

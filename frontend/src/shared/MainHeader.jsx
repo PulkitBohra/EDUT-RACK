@@ -1,5 +1,5 @@
 import { Flex, Image } from '@chakra-ui/react';
-import { Link } from 'react-router-dom'; // Use React Router's Link
+import { Link } from 'react-router-dom'; 
 import React from 'react';
 
 const MainHeader = () => {
