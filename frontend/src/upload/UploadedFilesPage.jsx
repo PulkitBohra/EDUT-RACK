@@ -47,14 +47,14 @@ const CustomTable = ({ children, ...props }) => (
         overflow: "hidden",
         textOverflow: "ellipsis",
       },
-      "tr": {
+      tr: {
         "&:nth-of-type(even)": {
           backgroundColor: useColorModeValue("gray.50", "gray.800"),
         },
         "&:hover": {
           backgroundColor: useColorModeValue("gray.100", "gray.700"),
-        }
-      }
+        },
+      },
     }}
     {...props}
   >
@@ -85,7 +85,7 @@ const CustomTd = ({ children, ...props }) => (
     fontSize="sm"
     py={2}
     px={4}
-    bg={props.bg || "inherit"} 
+    bg={props.bg || "inherit"}
     {...props}
   >
     {children === undefined || children === null || children === ""
@@ -216,16 +216,33 @@ const UploadedFilesPage = () => {
           weight: normalizedWeights[i],
         };
 
-        if (componentLevel > 0) {
-          directAssessmentNumerator += componentLevel * normalizedWeights[i];
-          directAssessmentDenominator += normalizedWeights[i];
-        }
-      });
+        //   if (componentLevel > 0) {
+        //     directAssessmentNumerator += componentLevel * normalizedWeights[i];
+        //     directAssessmentDenominator += normalizedWeights[i];
+        //   }
+        // });
 
-      if (directAssessmentDenominator > 0) {
-        rowData.attainmentLevel =
-          directAssessmentNumerator / directAssessmentDenominator;
-      }
+        // if (directAssessmentDenominator > 0) {
+        //   rowData.attainmentLevel =
+        //     directAssessmentNumerator / directAssessmentDenominator;
+        // }
+
+        // rowData.overallAttainment =
+        //   0.8 * rowData.attainmentLevel + 0.2 * indirectAttainment;
+        // rowData.overallPercentage = (rowData.overallAttainment / 3) * 100;
+
+        // detailedAnalysisData.push(rowData);
+      });
+      // Calculate overall attainment level (average of component levels)
+      const componentLevels = componentNames.map(
+        (comp) => rowData.components[comp].value
+      );
+      const validComponents = componentLevels.filter((level) => level > 0);
+      rowData.attainmentLevel =
+        validComponents.length > 0
+          ? validComponents.reduce((sum, level) => sum + level, 0) /
+            validComponents.length
+          : 0;
 
       rowData.overallAttainment =
         0.8 * rowData.attainmentLevel + 0.2 * indirectAttainment;
@@ -249,7 +266,6 @@ const UploadedFilesPage = () => {
     }
 
     try {
-      
       chartElement.style.visibility = "visible";
       chartElement.style.display = "block";
 
@@ -287,17 +303,14 @@ const UploadedFilesPage = () => {
       // Safe merge function
       const safeMergeCells = (worksheet, range) => {
         try {
-          
           if (range.left === range.right && range.top === range.bottom) return;
 
-          
           worksheet.mergeCells(range);
         } catch (error) {
           console.warn(`Merge cells skipped:`, error.message);
         }
       };
 
-      
       const chartImage = await new Promise((resolve) => {
         setTimeout(async () => {
           try {
@@ -325,20 +338,32 @@ const UploadedFilesPage = () => {
 
       const addWorksheet = (workbook, sheetName, data) => {
         const worksheet = workbook.addWorksheet(sheetName);
-
-        
+      
         data.forEach((row, rowIndex) => {
           const excelRow = worksheet.addRow(row);
-
-          
+      
           excelRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-            if (row[colNumber - 1]) {
-              
-              if (rowIndex === 0) {
-                
+            // Always apply styling, even for empty cells or cells with 0 values
+            if (rowIndex === 0) {
+              cell.font = {
+                bold: true,
+                size: 14,
+                color: { argb: colors.headerText },
+              };
+              cell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: colors.headerBg },
+              };
+              cell.alignment = { horizontal: "center" };
+            } else if (
+              row[0] === "CO Attainment Summary" ||
+              row[0] === "CO Attainment Levels" ||
+              row[0] === "Observations"
+            ) {
+              if (colNumber === 1) {
                 cell.font = {
                   bold: true,
-                  size: 14,
                   color: { argb: colors.headerText },
                 };
                 cell.fill = {
@@ -346,68 +371,43 @@ const UploadedFilesPage = () => {
                   pattern: "solid",
                   fgColor: { argb: colors.headerBg },
                 };
-                cell.alignment = { horizontal: "center" };
-              } else if (
-                row[0] === "CO Attainment Summary" ||
-                row[0] === "CO Attainment Levels" ||
-                row[0] === "Observations"
-              ) {
-                
-                if (colNumber === 1) {
-                  
-                  cell.font = {
-                    bold: true,
-                    color: { argb: colors.headerText },
-                  };
-                  cell.fill = {
-                    type: "pattern",
-                    pattern: "solid",
-                    fgColor: { argb: colors.headerBg },
-                  };
-                }
-              } else if (
-                rowIndex > 0 &&
-                row.some(
-                  (cell) => typeof cell === "string" && cell.includes("CO")
-                )
-              ) {
-                
-                cell.font = { bold: true };
-                cell.fill = {
-                  type: "pattern",
-                  pattern: "solid",
-                  fgColor: { argb: colors.accentBg },
-                };
-              } else if (rowIndex > 0) {
-                
-                cell.font = { color: { argb: colors.text } };
-                cell.fill = {
-                  type: "pattern",
-                  pattern: "solid",
-                  fgColor: {
-                    argb:
-                      rowIndex % 2 === 0 ? colors.evenRowBg : colors.oddRowBg,
-                  },
-                };
               }
-
-              
-              cell.border = {
-                top: { style: "thin", color: { argb: colors.border } },
-                left: { style: "thin", color: { argb: colors.border } },
-                bottom: { style: "thin", color: { argb: colors.border } },
-                right: { style: "thin", color: { argb: colors.border } },
+            } else if (
+              rowIndex > 0 &&
+              row.some((cell) => typeof cell === "string" && cell.includes("CO"))
+            ) {
+              cell.font = { bold: true };
+              cell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: colors.accentBg },
               };
-
-              cell.alignment = {
-                wrapText: true,
-                vertical: "middle",
-                horizontal: "center",
+            } else if (rowIndex > 0) {
+              // Apply styling to all cells in the row, including those with 0 values
+              cell.font = { color: { argb: colors.text } };
+              cell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: {
+                  argb: rowIndex % 2 === 0 ? colors.evenRowBg : colors.oddRowBg,
+                },
               };
             }
+      
+            cell.border = {
+              top: { style: "thin", color: { argb: colors.border } },
+              left: { style: "thin", color: { argb: colors.border } },
+              bottom: { style: "thin", color: { argb: colors.border } },
+              right: { style: "thin", color: { argb: colors.border } },
+            };
+      
+            cell.alignment = {
+              wrapText: true,
+              vertical: "middle",
+              horizontal: "center",
+            };
           });
 
-          
           if (rowIndex === 0 && row.length > 1) {
             safeMergeCells(worksheet, {
               top: excelRow.number,
@@ -430,7 +430,6 @@ const UploadedFilesPage = () => {
           }
         });
 
-        
         worksheet.columns.forEach((column) => {
           let maxLength = 0;
           column.eachCell({ includeEmpty: true }, (cell) => {
@@ -443,7 +442,6 @@ const UploadedFilesPage = () => {
         return worksheet;
       };
 
-      
       try {
         Object.keys(processedData).forEach((sheetName) => {
           const sheetData = processedData[sheetName];
@@ -552,7 +550,6 @@ const UploadedFilesPage = () => {
         throw sheetError;
       }
 
-      
       const detailedAnalysis = getDetailedAnalysisData();
       const detailedCOAnalysisSheet = [
         ["THE LNMIIT JAIPUR"],
@@ -602,7 +599,7 @@ const UploadedFilesPage = () => {
         ...detailedAnalysis.map((row) => [threshold, row.co]),
         [],
         [],
-        ["Observations", "",""], // Explicitly fill all columns
+        ["Observations", "", ""], // Explicitly fill all columns
         [
           "",
           `1. ${
@@ -616,9 +613,7 @@ const UploadedFilesPage = () => {
                   )}) with attainment ≥ ${threshold}% indicate GOOD performance.`
               : `No COs met or exceeded the ${threshold}% target`
           }`,
-          "", 
-         
-          
+          "",
         ],
         [
           "",
@@ -633,9 +628,7 @@ const UploadedFilesPage = () => {
                   )}) with attainment < ${threshold}% suggest areas needing improvement.`
               : `All COs met or exceeded the ${threshold}% target`
           }`,
-          "", 
-          
-          
+          "",
         ],
         [],
         [],
@@ -647,8 +640,7 @@ const UploadedFilesPage = () => {
         "Detailed CO Analysis",
         detailedCOAnalysisSheet
       );
-      
-     
+
       safeMergeCells(detailedWorksheet, {
         top: 1,
         left: 1,
@@ -663,24 +655,19 @@ const UploadedFilesPage = () => {
         right: 7,
       });
 
-      
       if (detailedWorksheet.columns && detailedWorksheet.columns.length > 0) {
-        detailedWorksheet.columns[0].width = 35; 
+        detailedWorksheet.columns[0].width = 35;
       }
 
-      
       if (detailedWorksheet.columns && detailedWorksheet.columns.length > 1) {
-        
         detailedWorksheet.columns[1].width = 40;
 
-        
         componentNames.forEach((_, i) => {
           if (detailedWorksheet.columns[2 + i]) {
             detailedWorksheet.columns[2 + i].width = 10;
           }
         });
 
-        
         const attainmentLevelCol = 2 + componentNames.length;
         const indirectAssessmentCol = attainmentLevelCol + 1;
         const overallAttainmentCol = indirectAssessmentCol + 1;
@@ -700,7 +687,6 @@ const UploadedFilesPage = () => {
         }
       }
 
-      
       detailedWorksheet.getRow(1).font = {
         bold: true,
         size: 16,
@@ -719,7 +705,6 @@ const UploadedFilesPage = () => {
         fgColor: { argb: colors.accentBg },
       };
 
-      
       const weightRow = detailedWorksheet.getRow(9);
       weightRow.font = { italic: true, color: { argb: colors.lightText } };
       weightRow.eachCell((cell) => {
@@ -732,15 +717,21 @@ const UploadedFilesPage = () => {
         }
       });
 
-      
       const observationsStartRow = detailedCOAnalysisSheet.length - 6;
       for (let i = observationsStartRow; i <= observationsStartRow + 2; i++) {
         const row = detailedWorksheet.getRow(i);
+        // Apply styling to all cells in these rows
+  row.eachCell((cell) => {
+    cell.font = { bold: true };
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: colors.highlightBg },
+    };
+  });
 
-        
         const lastColWithContent = detailedCOAnalysisSheet[i - 1].length;
 
-        
         for (let col = 1; col <= lastColWithContent; col++) {
           const cell = row.getCell(col);
           cell.font = { bold: true };
@@ -751,19 +742,17 @@ const UploadedFilesPage = () => {
           };
         }
 
-        
         for (let col = lastColWithContent + 1; col <= 7; col++) {
           const cell = row.getCell(col);
           cell.font = {};
           cell.fill = {
             type: "pattern",
             pattern: "solid",
-            fgColor: { argb: colors.oddRowBg }, 
+            fgColor: { argb: colors.oddRowBg },
           };
         }
       }
 
-      
       if (chartImage) {
         try {
           const imageId = workbook.addImage({
@@ -780,7 +769,6 @@ const UploadedFilesPage = () => {
             editAs: "oneCell",
           });
 
-          
           safeMergeCells(detailedWorksheet, {
             top: imageRow - 1,
             left: 1,
@@ -802,7 +790,6 @@ const UploadedFilesPage = () => {
         }
       }
 
-      
       const buffer = await workbook.xlsx.writeBuffer();
       const data = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
