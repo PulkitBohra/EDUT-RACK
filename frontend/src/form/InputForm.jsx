@@ -60,7 +60,7 @@ const InputForm = () => {
     const fetchUserCourses = async () => {
       try {
         const token = localStorage.getItem("token"); // Make sure you're saving token on login
-        const res = await axios.get("http://localhost:5000/api/users/profile", {
+        const res = await axios.get("https://edut-rack-backend.onrender.com/api/users/profile", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
