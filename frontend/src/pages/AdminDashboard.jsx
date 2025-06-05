@@ -30,7 +30,7 @@ const AdminDashboard = () => {
 
   const fetchUsers = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/users");
+      const res = await axios.get("https://edut-rack-backend.onrender.com/api/users");
       console.log(res.data); 
       setUsers(res.data);
     } catch (err) {
@@ -48,7 +48,7 @@ const AdminDashboard = () => {
 
   const handleAddUser = async () => {
     try {
-      await axios.post("http://localhost:5000/api/users", newUser);
+      await axios.post("https://edut-rack-backend.onrender.com/api/users", newUser);
       toast({ title: "User added!", status: "success" });
       fetchUsers();
       setNewUser({ fullname: "", email: "", password: "", role: "user", courses: [] });
@@ -65,7 +65,7 @@ const AdminDashboard = () => {
   const handleUpdateUser = async () => {
     try {
       await axios.put(
-        `http://localhost:5000/api/users/${editingUserId}`,
+        `https://edut-rack-backend.onrender.com/api/users/${editingUserId}`,
         editedUser
       );
       toast({ title: "User updated!", status: "success" });
@@ -246,7 +246,7 @@ const AdminDashboard = () => {
                         colorScheme="red"
                         onClick={async () => {
                           await axios.delete(
-                            `http://localhost:5000/api/users/${user._id}`
+                            `https://edut-rack-backend.onrender.com/api/users/${user._id}`
                           );
                           fetchUsers();
                         }}
