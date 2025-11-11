@@ -21,6 +21,7 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:5000",
   "https://edut-rack-backend.onrender.com",
+  "https://edut-rack.onrender.com",
 ];
 
 app.use(
