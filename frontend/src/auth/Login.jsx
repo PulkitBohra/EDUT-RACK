@@ -21,7 +21,7 @@ const Login = () => {
     }
 
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/login", {
+      const res = await axios.post("https://edut-rack-backend.onrender.com/api/auth/login", {
         email,
         password,
       });
