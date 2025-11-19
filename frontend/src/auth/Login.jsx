@@ -27,6 +27,12 @@ const Login = () => {
       });
       const { user, token } = res.data;
 
+      if (role !== user.role) {
+        alert(`You selected "${role}" but you are registered as "${user.role}".`);
+        return;
+      }
+
+
       localStorage.setItem("token", token);
       localStorage.setItem("role", user.role);
 
