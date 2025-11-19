@@ -13,7 +13,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:5000', // 👈 replace with your actual backend port
+      '/api': 'https://edut-rack-backend.onrender.com', // replace with your actual backend port
     },
   },
 })
